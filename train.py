@@ -194,7 +194,7 @@ class T5Trainer(BaseTrainer):
         outputs = self.model(
             input_ids=batch['input_ids'].to(self.device),
             attention_mask=batch['attention_mask'].to(self.device),
-            labels=batch['attention_mask'].to(self.device),
+            labels=batch['labels'].to(self.device),
         )
         return outputs.loss
 
@@ -205,7 +205,6 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    # parser.add_argument('--')
     parser.add_argument('--batch-size', type=int, default=64)
     parser.add_argument('--learning-rate', type=float, default=5e-5)
 

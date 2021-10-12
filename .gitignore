@@ -130,3 +130,4 @@ dmypy.json
 
 # repo specific
 data/
+log/
