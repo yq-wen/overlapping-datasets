@@ -254,7 +254,7 @@ if __name__ == '__main__':
 
     tokenizer = AutoTokenizer.from_pretrained("t5-small")
 
-    test_dict = build_dd_test_dict(tokenizer)
+    test_dict = build_dd_test_dict(max_num_dialogues=100)
 
     if args.output_file:
         stream = open(args.output_file, mode='w')

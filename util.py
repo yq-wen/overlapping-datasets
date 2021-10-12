@@ -1,11 +1,13 @@
 import argparse
+import random
 
 from collections import OrderedDict
 from transformers import AutoTokenizer
 
 def build_dd_test_dict(
-        tokenizer,
         num_contexts=1,
+        max_num_dialogues=None,
+        seed=0,
         path='data/ijcnlp_dailydialog/test/dialogues_test.txt'
     ):
     '''Given a path, build a dictionary tha maps contexts to the corresponding
@@ -18,8 +20,10 @@ def build_dd_test_dict(
         raw_dialogues = f.readlines()
     num_dialogues = len(raw_dialogues)
 
-    contexts = []
-    responses = []
+    if max_num_dialogues:
+        random.seed(seed)
+        random.shuffle(raw_dialogues)
+        num_dialogues = min(max_num_dialogues, num_dialogues)
 
     for i in range(num_dialogues):
 
@@ -39,7 +43,7 @@ def build_dd_test_dict(
 if __name__ == '__main__':
 
     tokenizer = AutoTokenizer.from_pretrained("t5-small")
-    test_dict = build_dd_test_dict(tokenizer)
+    test_dict = build_dd_test_dict()
 
     for context, response in test_dict.items():
         print(context, ' | ', response)
