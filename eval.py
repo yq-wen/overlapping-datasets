@@ -86,7 +86,7 @@ def calc_pairwise_bleu(hyps):
         pairwise_bleu += sentence_bleu([hyps[i]], hyps[j])
     return pairwise_bleu / len(perms)
 
-def eval_model(test_dict, model, tokenizer, generate_func=generate_fn):
+def eval_model(test_dict, model, tokenizer, generate_func=generate_fn, stream=None):
     '''
     Arguments:
         test_dict (dict): post (str) -> responses (list<str>)
@@ -95,6 +95,12 @@ def eval_model(test_dict, model, tokenizer, generate_func=generate_fn):
     Return:
         dict: metric (str) -> value (float)
     '''
+
+    def _log(*args):
+        if stream:
+            print(*args, file=stream)
+        else:
+            print(*args)
 
     chosen_count = np.zeros(1)
 
@@ -135,7 +141,7 @@ def eval_model(test_dict, model, tokenizer, generate_func=generate_fn):
         best_response = ''
         highest_bleu = -1
 
-        print('{}/{} - Post: {}'.format(i, num_posts - 1, ' '.join(inp)))
+        _log('{}/{} - Post: {}'.format(i, num_posts - 1, ' '.join(inp)))
 
         # ----- deal with generated response for each decoder -----
         for j in range(len(generated_responses)):
@@ -173,64 +179,64 @@ def eval_model(test_dict, model, tokenizer, generate_func=generate_fn):
                 model_response = generated_response
                 chosen_idx = j
 
-            print('Decoder {}, bleu={:.5f}, self_ppl={:9.2f}: {}'.format(j, bleu, self_ppl, generated_response))
+            _log('Decoder {}, bleu={:.5f}, self_ppl={:9.2f}: {}'.format(j, bleu, self_ppl, generated_response))
 
         chosen_count[chosen_idx] += 1
 
-        print()
+        _log()
 
         corp_model_hyps.append(str_tokenize(tokenizer, model_response))
         corp_best_hyps.append(str_tokenize(tokenizer, best_response))
 
-    print('---------- Results ----------')
+    _log('---------- Results ----------')
 
     # print(i_corpus_bleu(corp_refs, corp_best_hyps, corp_inps))
-    print('sent_bleus (1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
+    _log('sent_bleus (1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
         statistics.mean(sent_bleu_1s),
         statistics.mean(sent_bleu_2s),
         statistics.mean(sent_bleu_3s),
         statistics.mean(sent_bleu_4s),
     ))
-    print('sent_ibleus (1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
+    _log('sent_ibleus (1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
         statistics.mean(sent_ibleu_1s),
         statistics.mean(sent_ibleu_2s),
         statistics.mean(sent_ibleu_3s),
         statistics.mean(sent_ibleu_4s),
     ))
-    print()
+    _log()
 
     corp_model_bleu = corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[3])
-    print('corp_model_bleus(1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
+    _log('corp_model_bleus(1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
         corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[0]),
         corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[1]),
         corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[2]),
         corp_model_bleu,
     ))
     corp_model_ibleu = i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[3])
-    print('corp_model_ibleus(1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
+    _log('corp_model_ibleus(1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
         i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[0]),
         i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[1]),
         i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[2]),
         corp_model_ibleu,
     ))
-    print()
+    _log()
 
     corp_best_bleu = corpus_bleu(corp_refs, corp_best_hyps, weights=BLEU_WEIGHTS_MEAN[3])
-    print('corp_best_bleus(1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
+    _log('corp_best_bleus(1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
         corpus_bleu(corp_refs, corp_best_hyps, weights=BLEU_WEIGHTS_MEAN[0]),
         corpus_bleu(corp_refs, corp_best_hyps, weights=BLEU_WEIGHTS_MEAN[1]),
         corpus_bleu(corp_refs, corp_best_hyps, weights=BLEU_WEIGHTS_MEAN[2]),
         corp_best_bleu,
     ))
     corp_best_ibleu = i_corpus_bleu(corp_refs, corp_best_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[3])
-    print('corp_best_ibleus(1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
+    _log('corp_best_ibleus(1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
         i_corpus_bleu(corp_refs, corp_best_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[0]),
         i_corpus_bleu(corp_refs, corp_best_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[1]),
         i_corpus_bleu(corp_refs, corp_best_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[2]),
         corp_best_ibleu,
     ))
 
-    print()
+    _log()
 
     # eval_ as prefix for huggingface logger to understand that this is eval...
     return {
