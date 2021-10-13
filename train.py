@@ -10,6 +10,8 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import Dataset, DataLoader
 from dailydialogue import DailyDialogueDataset
 from dateutil import tz
+from eval import eval_model
+from util import build_dd_test_dict
 
 
 class Logger():
@@ -198,6 +200,15 @@ class T5Trainer(BaseTrainer):
         )
         return outputs.loss
 
+    def epoch_end(self):
+
+        with open(pathlib.PosixPath(self.log_dir, '_epoch_{}.pt.eval'.format(self.epoch)), mode='w') as f:
+            results = eval_model(TEST_DICT, self.model, tokenizer, stream=f)
+
+        for k, v in results.items():
+            print('{}: {}'.format(k, v))
+            self.writer.add_scalar(k, v, self.global_step)
+
 
 if __name__ == '__main__':
 
@@ -211,6 +222,8 @@ if __name__ == '__main__':
 
     tokenizer = AutoTokenizer.from_pretrained("t5-small")
     model = AutoModelWithLMHead.from_pretrained("t5-small")
+
+    TEST_DICT = build_dd_test_dict(max_num_dialogues=100)
 
     train_dataset = DailyDialogueDataset(tokenizer)
 
