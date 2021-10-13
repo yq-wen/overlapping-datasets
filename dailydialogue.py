@@ -7,7 +7,7 @@ from transformers import AutoTokenizer, AutoModelWithLMHead
 
 class DailyDialogueDataset(Dataset):
 
-    def __init__(self, tokenizer, split='test', num_contexts=1, max_length=32, dir='data/ijcnlp_dailydialog'):
+    def __init__(self, tokenizer, split='train', num_contexts=1, max_length=32, dir='data/ijcnlp_dailydialog'):
 
         assert split in ['train', 'validation', 'test']
 
