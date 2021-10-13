@@ -223,7 +223,10 @@ if __name__ == '__main__':
     tokenizer = AutoTokenizer.from_pretrained("t5-small")
     model = AutoModelWithLMHead.from_pretrained("t5-small")
 
-    TEST_DICT = build_dd_test_dict(max_num_dialogues=100)
+    TEST_DICT = build_dd_test_dict(
+        path='data/ijcnlp_dailydialog/validation/dialogues_validation.txt',
+        max_num_dialogues=100
+    )
 
     train_dataset = DailyDialogueDataset(tokenizer)
 
