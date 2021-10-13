@@ -205,16 +205,19 @@ def eval_model(test_dict, model, tokenizer, generate_func=generate_fn, stream=No
     ))
     _log()
 
+    corp_model_bleu1 = corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[0])
     corp_model_bleu = corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[3])
     _log('corp_model_bleus(1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
-        corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[0]),
+        corp_model_bleu1,
         corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[1]),
         corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[2]),
         corp_model_bleu,
     ))
+
+    corp_model_ibleu1 = i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[0])
     corp_model_ibleu = i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[3])
     _log('corp_model_ibleus(1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
-        i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[0]),
+        corp_model_ibleu1,
         i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[1]),
         i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[2]),
         corp_model_ibleu,
@@ -240,10 +243,12 @@ def eval_model(test_dict, model, tokenizer, generate_func=generate_fn, stream=No
 
     # eval_ as prefix for huggingface logger to understand that this is eval...
     return {
-        'eval_corp_model_bleu': corp_model_bleu,
-        'eval_corp_model_ibleu': corp_model_ibleu,
-        'eval_corp_best_bleu': corp_best_bleu,
-        'eval_corp_best_ibleu': corp_best_ibleu,
+        'corp_model_bleu1': corp_model_bleu1,
+        'corp_model_bleu': corp_model_bleu,
+        'corp_model_ibleu1': corp_model_ibleu1,
+        'corp_model_ibleu': corp_model_ibleu,
+        'corp_best_bleu': corp_best_bleu,
+        'corp_best_ibleu': corp_best_ibleu,
     }
 
 if __name__ == '__main__':
