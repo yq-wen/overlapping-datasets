@@ -35,7 +35,7 @@ def build_dd_test_dict(
             context_lst = utterances[j : j + num_contexts]
             context_str = ' '.join(context_lst)
             response_str = utterances[j + num_contexts]
-            test_dict[context_str] = response_str
+            test_dict[context_str] = [response_str]
 
     return test_dict
 
