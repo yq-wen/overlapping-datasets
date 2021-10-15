@@ -219,9 +219,8 @@ if __name__ == '__main__':
     parser.add_argument('--batch-size', type=int, default=64)
     parser.add_argument('--learning-rate', type=float, default=5e-5)
 
-
-    tokenizer = AutoTokenizer.from_pretrained("t5-small")
-    model = AutoModelWithLMHead.from_pretrained("t5-small")
+    tokenizer = AutoTokenizer.from_pretrained("t5-base")
+    model = AutoModelWithLMHead.from_pretrained("t5-base")
 
     TEST_DICT = build_dd_test_dict(
         path='data/ijcnlp_dailydialog/validation/dialogues_validation.txt',

@@ -73,7 +73,7 @@ class DailyDialogueDataset(Dataset):
 
 if __name__ == '__main__':
 
-    tokenizer = AutoTokenizer.from_pretrained("t5-small")
-    # model = AutoModelWithLMHead.from_pretrained("t5-small")
+    tokenizer = AutoTokenizer.from_pretrained("t5-base")
+    # model = AutoModelWithLMHead.from_pretrained("t5-base")
 
     dataset = DailyDialogueDataset(tokenizer)

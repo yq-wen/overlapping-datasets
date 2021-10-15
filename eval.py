@@ -263,7 +263,7 @@ if __name__ == '__main__':
     model = torch.load(args.ckpt_path, map_location=device)
     model.eval()
 
-    tokenizer = AutoTokenizer.from_pretrained("t5-small")
+    tokenizer = AutoTokenizer.from_pretrained("t5-base")
 
     test_dict = build_dd_test_dict(max_num_dialogues=100)
 

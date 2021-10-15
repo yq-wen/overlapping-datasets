@@ -42,7 +42,7 @@ def build_dd_test_dict(
 
 if __name__ == '__main__':
 
-    tokenizer = AutoTokenizer.from_pretrained("t5-small")
+    tokenizer = AutoTokenizer.from_pretrained("t5-base")
     test_dict = build_dd_test_dict()
 
     for context, response in test_dict.items():
