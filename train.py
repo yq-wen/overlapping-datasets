@@ -223,7 +223,7 @@ if __name__ == '__main__':
     model = AutoModelWithLMHead.from_pretrained("t5-base")
 
     TEST_DICT = build_dd_test_dict(
-        path='data/ijcnlp_dailydialog/validation/dialogues_validation.txt',
+        path='data/clean_dailydialog/validation/dialogues_validation_clean.txt',
         max_num_dialogues=100
     )
 

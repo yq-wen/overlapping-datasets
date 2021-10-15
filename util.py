@@ -8,7 +8,7 @@ def build_dd_test_dict(
         num_contexts=1,
         max_num_dialogues=None,
         seed=0,
-        path='data/ijcnlp_dailydialog/test/dialogues_test.txt'
+        path='data/clean_dailydialog/test/dialogues_test_clean.txt'
     ):
     '''Given a path, build a dictionary tha maps contexts to the corresponding
     response

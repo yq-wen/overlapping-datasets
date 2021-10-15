@@ -7,11 +7,11 @@ from transformers import AutoTokenizer, AutoModelWithLMHead
 
 class DailyDialogueDataset(Dataset):
 
-    def __init__(self, tokenizer, split='train', num_contexts=1, max_length=32, dir='data/ijcnlp_dailydialog'):
+    def __init__(self, tokenizer, split='train', num_contexts=1, max_length=32, dir='data/clean_dailydialog'):
 
         assert split in ['train', 'validation', 'test']
 
-        dialogues = 'dialogues_{}.txt'.format(split)
+        dialogues = 'dialogues_{}_clean.txt'.format(split)
 
 
         with open(PosixPath(dir, split, dialogues), mode='r') as f_dialogues:
