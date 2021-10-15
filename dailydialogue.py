@@ -11,7 +11,7 @@ class DailyDialogueDataset(Dataset):
 
         assert split in ['train', 'validation', 'test']
 
-        dialogues = 'dialogues_{}_clean.txt'.format(split)
+        dialogues = 'dialogues_{}.txt'.format(split)
 
 
         with open(PosixPath(dir, split, dialogues), mode='r') as f_dialogues:
