@@ -56,7 +56,7 @@ def generate_fn(model, tokenizer, post):
         repetition_penalty=1.2,  # recommended in https://arxiv.org/pdf/1909.05858.pdf
         output_scores=True,
         return_dict_in_generate=True,
-        max_length=32,
+        max_length=20,
     )
 
     # generated sequence always start with decoder_start_token_id, which we ignore here
@@ -180,6 +180,7 @@ def eval_model(test_dict, model, tokenizer, generate_func=generate_fn, stream=No
                 chosen_idx = j
 
             _log('Decoder {}, bleu={:.5f}, self_ppl={:9.2f}: {}'.format(j, bleu, self_ppl, generated_response))
+            _log('Ref Response: {}'.format(reference_responses[0]))
 
         chosen_count[chosen_idx] += 1
 
@@ -255,7 +256,6 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser('Script for evaluating models')
     parser.add_argument('--ckpt-path', type=str, default='')
-    parser.add_argument('--test-dict-path', type=str, default='../data/test.clean')
     parser.add_argument('--output-file', type=str, default='')
 
     args = parser.parse_args()
