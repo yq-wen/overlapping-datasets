@@ -255,21 +255,26 @@ def eval_model(test_dict, model, tokenizer, generate_func=generate_fn, stream=No
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser('Script for evaluating models')
-    parser.add_argument('--ckpt-path', type=str, default='')
+    parser.add_argument('--ckpt', type=str, default='')
     parser.add_argument('--output-file', type=str, default='')
+    parser.add_argument('--test-dict-path', type=str, default='data/clean_dailydialog/test/dialogues_test.txt')
+    parser.add_argument('--max-num-dialogues', type=int, default=sys.maxsize)
 
     args = parser.parse_args()
 
-    model = torch.load(args.ckpt_path, map_location=device)
+    model = torch.load(args.ckpt, map_location=device)
     model.eval()
 
     tokenizer = AutoTokenizer.from_pretrained("t5-base")
 
-    test_dict = build_dd_test_dict(max_num_dialogues=100)
+    test_dict = build_dd_test_dict(
+        path=args.test_dict_path,
+        max_num_dialogues=args.max_num_dialogues,
+    )
 
     if args.output_file:
         stream = open(args.output_file, mode='w')
     else:
-        stream = open(args.ckpt_path + '.test', mode='w')
+        stream = open(args.ckpt + '.test', mode='w')
 
-    eval_model(test_dict, model, tokenizer)
+    eval_model(test_dict, model, tokenizer, stream=stream)
