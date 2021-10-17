@@ -48,8 +48,8 @@ def build_dd_test_dict_from_csv(
     test_dict = OrderedDict()
     df = pd.read_csv(path)
 
+    num_dialogues = len(df.index)
     if max_num_dialogues:
-        num_dialogues = len(df.index)
         df = df.sample(frac=1, random_state=seed).reset_index(drop=True)
         num_dialogues = min(max_num_dialogues, num_dialogues)
 
@@ -64,7 +64,7 @@ def build_dd_test_dict_from_csv(
 if __name__ == '__main__':
 
     tokenizer = AutoTokenizer.from_pretrained("t5-base")
-    test_dict = build_dd_test_dict()
+    test_dict = build_dd_test_dict_from_csv(max_num_dialogues=1000)
 
     for context, response in test_dict.items():
         print(context, ' | ', response)
