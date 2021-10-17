@@ -9,8 +9,7 @@ import itertools
 from nltk.translate.bleu_score import sentence_bleu, corpus_bleu
 from metric.bleus import i_sentence_bleu, i_corpus_bleu
 from transformers import AutoTokenizer
-from collections import OrderedDict
-from util import build_dd_test_dict
+from util import build_dd_test_dict_from_csv
 from nltk.collocations import BigramCollocationFinder
 from nltk.probability import FreqDist
 from nltk import word_tokenize
@@ -293,7 +292,7 @@ if __name__ == '__main__':
 
     tokenizer = AutoTokenizer.from_pretrained("t5-base")
 
-    test_dict = build_dd_test_dict(
+    test_dict = build_dd_test_dict_from_csv(
         path=args.test_dict_path,
         max_num_dialogues=args.max_num_dialogues,
     )
