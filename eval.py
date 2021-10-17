@@ -11,6 +11,9 @@ from metric.bleus import i_sentence_bleu, i_corpus_bleu
 from transformers import AutoTokenizer
 from collections import OrderedDict
 from util import build_dd_test_dict
+from nltk.collocations import BigramCollocationFinder
+from nltk.probability import FreqDist
+from nltk import word_tokenize
 
 
 BLEU_WEIGHTS_MEAN = [
@@ -30,10 +33,10 @@ BLEU_WEIGHTS_SINGLE = [
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
-def str_tokenize(tokenizer, sent):
+def str_tokenize(sent):
     '''Given a sentence (str), return a list of tokenized characters
     '''
-    return tokenizer.decode(tokenizer.encode(sent), skip_special_tokens=True).split()
+    return word_tokenize(sent)
 
 def generate_fn(model, tokenizer, post):
     '''
@@ -86,6 +89,23 @@ def calc_pairwise_bleu(hyps):
         pairwise_bleu += sentence_bleu([hyps[i]], hyps[j])
     return pairwise_bleu / len(perms)
 
+def calculate_ngram_diversity(corpus):
+    """
+    Calculates unigram and bigram diversity
+    Args:
+        corpus: tokenized list of sentences sampled
+    Returns:
+        uni_diversity: distinct-1 score
+        bi_diversity: distinct-2 score
+    """
+    bigram_finder = BigramCollocationFinder.from_words(corpus)
+    bi_diversity = len(bigram_finder.ngram_fd) / bigram_finder.N
+
+    dist = FreqDist(corpus)
+    uni_diversity = len(dist) / len(corpus)
+
+    return uni_diversity, bi_diversity
+
 def eval_model(test_dict, model, tokenizer, generate_func=generate_fn, stream=None):
     '''
     Arguments:
@@ -126,10 +146,10 @@ def eval_model(test_dict, model, tokenizer, generate_func=generate_fn, stream=No
 
         generated_responses, self_ppls = generate_func(model, tokenizer, post)
 
-        inp = str_tokenize(tokenizer, post)
+        inp = str_tokenize(post)
         corp_inps.append(inp)
 
-        ref = list(map(lambda x: str_tokenize(tokenizer, x), reference_responses))
+        ref = list(map(lambda x: str_tokenize(x), reference_responses))
         corp_refs.append(ref)
 
         # for finding the response that the model is most confident with
@@ -149,7 +169,7 @@ def eval_model(test_dict, model, tokenizer, generate_func=generate_fn, stream=No
             generated_response = generated_responses[j]
             self_ppl = self_ppls[j]
 
-            hyp = str_tokenize(tokenizer, generated_response)
+            hyp = str_tokenize(generated_response)
 
             sent_bleu_1 = sentence_bleu(ref, hyp, weights=BLEU_WEIGHTS_MEAN[0])
             sent_bleu_1s.append(sent_bleu_1)
@@ -186,8 +206,8 @@ def eval_model(test_dict, model, tokenizer, generate_func=generate_fn, stream=No
 
         _log()
 
-        corp_model_hyps.append(str_tokenize(tokenizer, model_response))
-        corp_best_hyps.append(str_tokenize(tokenizer, best_response))
+        corp_model_hyps.append(str_tokenize(model_response))
+        corp_best_hyps.append(str_tokenize(best_response))
 
     _log('---------- Results ----------')
 
@@ -240,6 +260,10 @@ def eval_model(test_dict, model, tokenizer, generate_func=generate_fn, stream=No
         corp_best_ibleu,
     ))
 
+    tokens = [token for sentence in corp_model_hyps for token in sentence]
+    dist_1, dist_2 = calculate_ngram_diversity(tokens)
+    _log('dist_1: {:.5f}, dist_2: {:.5f}'.format(dist_1, dist_2))
+
     _log()
 
     # eval_ as prefix for huggingface logger to understand that this is eval...
@@ -250,6 +274,8 @@ def eval_model(test_dict, model, tokenizer, generate_func=generate_fn, stream=No
         'corp_model_ibleu': corp_model_ibleu,
         'corp_best_bleu': corp_best_bleu,
         'corp_best_ibleu': corp_best_ibleu,
+        'dist_1': dist_1,
+        'dist_2': dist_2,
     }
 
 if __name__ == '__main__':
