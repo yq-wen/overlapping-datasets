@@ -1,4 +1,5 @@
 import torch
+import pandas as pd
 
 from pathlib import PosixPath
 from torch.utils.data import Dataset, DataLoader
@@ -71,34 +72,16 @@ class RawDailyDialogueDataset(Dataset):
 
 class DailyDialogueDataset(Dataset):
 
-    def __init__(self, tokenizer, split='train', num_contexts=1, max_length=20, dir='data/clean_dailydialog'):
+    def __init__(self, tokenizer, max_length=20, path='data/hareesh/df_daily_train.csv'):
 
-        assert split in ['train', 'validation', 'test']
-
-        dialogues = 'dialogues_{}.txt'.format(split)
-
-
-        with open(PosixPath(dir, split, dialogues), mode='r') as f_dialogues:
-            raw_dialogues = f_dialogues.readlines()
-        num_dialogues = len(raw_dialogues)
+        df = pd.read_csv(path)
 
         contexts = []
         responses = []
 
-        for i in range(num_dialogues):
-
-            # [:-1] because last string is empty after splitting
-            utterances = raw_dialogues[i].strip().split('__eou__')[:-1]
-
-            for j in range(len(utterances) - num_contexts):
-
-                context_lst = utterances[j : j + num_contexts]
-                context_str = '<sep>'.join(context_lst)
-
-                contexts.append(context_str)
-                responses.append(utterances[j + num_contexts] + ' ' + tokenizer.eos_token)
-
-        assert len(contexts) == len(responses)
+        for index, row in df.iterrows():
+            contexts.append(row['line'])
+            responses.append(row['reply'])
 
         inputs = tokenizer(
             contexts,

@@ -11,7 +11,7 @@ from torch.utils.data import Dataset, DataLoader
 from dailydialogue import DailyDialogueDataset
 from dateutil import tz
 from eval import eval_model
-from util import build_dd_test_dict
+from util import build_dd_test_dict_from_csv
 
 
 class Logger():
@@ -222,9 +222,9 @@ if __name__ == '__main__':
     tokenizer = AutoTokenizer.from_pretrained("t5-base")
     model = AutoModelWithLMHead.from_pretrained("t5-base")
 
-    TEST_DICT = build_dd_test_dict(
-        path='data/clean_dailydialog/validation/dialogues_validation.txt',
-        max_num_dialogues=100
+    TEST_DICT = build_dd_test_dict_from_csv(
+        path='data/hareesh/df_daily_valid_without_duplicates.csv',
+        max_num_dialogues=1000
     )
 
     train_dataset = DailyDialogueDataset(tokenizer)
