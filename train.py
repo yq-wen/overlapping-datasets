@@ -4,6 +4,7 @@ import datetime
 import pathlib
 import sys
 import subprocess
+import numpy as np
 
 from transformers import AutoTokenizer, AutoModelWithLMHead
 from torch.utils.tensorboard import SummaryWriter
@@ -212,12 +213,15 @@ class T5Trainer(BaseTrainer):
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser('Training script for T5')
+    np.random.seed(0)
 
-    args = parser.parse_args()
+    parser = argparse.ArgumentParser('Training script for T5')
 
     parser.add_argument('--batch-size', type=int, default=64)
     parser.add_argument('--learning-rate', type=float, default=5e-5)
+    parser.add_argument('--num-training-examples', type=int, default=128)
+
+    args = parser.parse_args()
 
     tokenizer = AutoTokenizer.from_pretrained("t5-base")
     model = AutoModelWithLMHead.from_pretrained("t5-base")
@@ -227,7 +231,13 @@ if __name__ == '__main__':
         max_num_dialogues=1000
     )
 
-    train_dataset = DailyDialogueDataset(tokenizer)
+    dataset = DailyDialogueDataset(tokenizer)
+
+    if args.num_training_examples:
+        indices = np.random.choice(len(dataset), size=args.num_training_examples, replace=False)
+        train_dataset = torch.utils.data.Subset(dataset, indices=indices)
+    else:
+        train_dataset = dataset
 
     trainer = T5Trainer(
         model=model,
