@@ -47,6 +47,7 @@ class BaseTrainer():
         log_root_dir=None,
         sanity=False,
         eval=False,
+        save_every=1,
     ):
 
         torch.manual_seed(0)
@@ -66,6 +67,7 @@ class BaseTrainer():
         self.sanity = sanity
         self.eval = eval
         self.batch_size = batch_size
+        self.save_every = save_every
 
         # Set up for logging
         if not log_root_dir:
@@ -120,7 +122,8 @@ class BaseTrainer():
 
     def save(self):
         if self.save_models:
-            torch.save(self.model, pathlib.PosixPath(self.log_dir, 'epoch_{}.pt'.format(self.epoch)))
+            if self.epoch % self.save_every == 0:
+                torch.save(self.model, pathlib.PosixPath(self.log_dir, 'epoch_{}.pt'.format(self.epoch)))
 
     def train(self):
 
@@ -192,6 +195,10 @@ class BaseTrainer():
 
 class T5Trainer(BaseTrainer):
 
+    def __init__(self, *args, eval_every=1, **kwargs):
+        self.eval_every = eval_every
+        return super().__init__(*args, **kwargs)
+
     def compute_loss(self, batch):
 
         outputs = self.model(
@@ -203,12 +210,14 @@ class T5Trainer(BaseTrainer):
 
     def epoch_end(self):
 
-        with open(pathlib.PosixPath(self.log_dir, '_epoch_{}.pt.eval'.format(self.epoch)), mode='w') as f:
-            results = eval_model(TEST_DICT, self.model, tokenizer, stream=f)
+        if self.epoch % self.eval_every == 0:
 
-        for k, v in results.items():
-            print('{}: {}'.format(k, v))
-            self.writer.add_scalar(k, v, self.global_step)
+            with open(pathlib.PosixPath(self.log_dir, '_epoch_{}.pt.eval'.format(self.epoch)), mode='w') as f:
+                results = eval_model(TEST_DICT, self.model, tokenizer, stream=f)
+
+            for k, v in results.items():
+                print('{}: {}'.format(k, v))
+                self.writer.add_scalar(k, v, self.global_step)
 
 
 if __name__ == '__main__':
@@ -219,7 +228,9 @@ if __name__ == '__main__':
 
     parser.add_argument('--batch-size', type=int, default=64)
     parser.add_argument('--learning-rate', type=float, default=5e-5)
-    parser.add_argument('--num-training-examples', type=int, default=128)
+    parser.add_argument('--num-training-examples', type=int, default=None)
+    parser.add_argument('--save-every', type=int, default=1)
+    parser.add_argument('--eval-every', type=int, default=1)
 
     args = parser.parse_args()
 
@@ -248,6 +259,8 @@ if __name__ == '__main__':
         batch_size=64,
         save_models=True,
         log_root_dir=None,
+        save_every=args.save_every,
+        eval_every=args.eval_every,
     )
 
     trainer.train()
