@@ -129,5 +129,6 @@ dmypy.json
 .pyre/
 
 # repo specific
-data/
+data/*
+!data/hareesh
 log/
