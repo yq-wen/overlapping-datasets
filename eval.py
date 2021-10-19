@@ -282,7 +282,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser('Script for evaluating models')
     parser.add_argument('--ckpt', type=str, default='')
     parser.add_argument('--output-file', type=str, default='')
-    parser.add_argument('--test-dict-path', type=str, default='data/clean_dailydialog/test/dialogues_test.txt')
+    parser.add_argument('--test-dict-path', type=str, default='data/hareesh/df_daily_test_without_duplicates.csv')
     parser.add_argument('--max-num-dialogues', type=int, default=sys.maxsize)
 
     args = parser.parse_args()
