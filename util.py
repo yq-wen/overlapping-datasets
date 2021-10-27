@@ -1,5 +1,6 @@
 import argparse
 import random
+import pandas as pd
 
 from collections import OrderedDict
 from transformers import AutoTokenizer
@@ -39,11 +40,31 @@ def build_dd_test_dict(
 
     return test_dict
 
+def build_dd_test_dict_from_csv(
+        max_num_dialogues=None,
+        seed=0,
+        path='data/hareesh/df_daily_test_without_duplicates.csv'
+    ):
+    test_dict = OrderedDict()
+    df = pd.read_csv(path)
+
+    num_dialogues = len(df.index)
+    if max_num_dialogues:
+        df = df.sample(frac=1, random_state=seed).reset_index(drop=True)
+        num_dialogues = min(max_num_dialogues, num_dialogues)
+
+    for index, row in df.iterrows():
+        if index < num_dialogues:
+            test_dict[row['line']] = [row['reply']]
+        else:
+            break
+
+    return test_dict
 
 if __name__ == '__main__':
 
     tokenizer = AutoTokenizer.from_pretrained("t5-base")
-    test_dict = build_dd_test_dict()
+    test_dict = build_dd_test_dict_from_csv(max_num_dialogues=1000)
 
     for context, response in test_dict.items():
         print(context, ' | ', response)

@@ -1,11 +1,12 @@
 import torch
+import pandas as pd
 
 from pathlib import PosixPath
 from torch.utils.data import Dataset, DataLoader
 from transformers import AutoTokenizer, AutoModelWithLMHead
 
 
-class DailyDialogueDataset(Dataset):
+class RawDailyDialogueDataset(Dataset):
 
     def __init__(self, tokenizer, split='train', num_contexts=1, max_length=20, dir='data/clean_dailydialog'):
 
@@ -35,6 +36,52 @@ class DailyDialogueDataset(Dataset):
                 responses.append(utterances[j + num_contexts] + ' ' + tokenizer.eos_token)
 
         assert len(contexts) == len(responses)
+
+        inputs = tokenizer(
+            contexts,
+            max_length=max_length,
+            truncation=True,
+            padding='max_length',
+            return_tensors='pt',
+        )
+
+        labels = tokenizer(
+            responses,
+            max_length=max_length,
+            truncation=True,
+            padding='max_length',
+            return_tensors='pt',
+        )
+        labels['input_ids'][labels['attention_mask'] == 0] = -100
+
+        self.data = dict()
+        self.data['input_ids'] = inputs['input_ids']
+        self.data['attention_mask'] = inputs['attention_mask']
+        self.data['labels'] = labels['input_ids']
+
+    def __getitem__(self, index):
+        return {
+            'input_ids': self.data['input_ids'][index],
+            'attention_mask': self.data['attention_mask'][index],
+            'labels': self.data['labels'][index],
+            'indices': index,
+        }
+
+    def __len__(self):
+        return len(self.data['input_ids'])
+
+class DailyDialogueDataset(Dataset):
+
+    def __init__(self, tokenizer, max_length=20, path='data/hareesh/df_daily_train.csv'):
+
+        df = pd.read_csv(path)
+
+        contexts = []
+        responses = []
+
+        for index, row in df.iterrows():
+            contexts.append(row['line'])
+            responses.append(row['reply'])
 
         inputs = tokenizer(
             contexts,
