@@ -1,20 +1,24 @@
+import sys
+sys.path.append('..')
+
 import argparse
 import Levenshtein
 import string
 import pandas as pd
 import numpy
+import preprocess_utils
 
-from collections import Counter
+import matplotlib.pyplot as plt
 
 from tqdm import tqdm
 from nltk import wordpunct_tokenize
 from nltk.corpus import stopwords
-import matplotlib.pyplot as plt
+from collections import Counter
 
 
 def flatten(path, num_contexts=1):
     '''Given the path to the DailyDialog file, convert the dialogs into a
-    flattened csv file
+    flattened dataframe
     '''
 
     # each entry is a list of [context, response]
@@ -45,60 +49,76 @@ def df2bow(df, w2i):
     bow = numpy.zeros((num_examples, vocab_size))
 
     for idx, row in tqdm(df.iterrows(), total=df.shape[0]):
-        line = row['line'] + ' ' + row['reply']
+        line = row['context'] + ' ' + row['response']
+        line = preprocess_utils.preprocess_str(line)
         tokens = wordpunct_tokenize(line)
-
         for token in tokens:
-            if token in string.punctuation or token in sw:
-                continue
-            else:
-                bow[idx, w2i[token]] = 1
+            bow[idx, w2i[token]] = 1
 
     return bow
 
-def get_score(train_bow, eval_bow):
 
-    train_len = train_bow.sum(axis=1)
-    eval_len = eval_bow.sum(axis=1)
-    overlap_bow = train_bow @ eval_bow.T  # (train_size, eval_size)
+def clean_and_dump(train_df, train_bow, eval_df, eval_bow, output_name):
+    '''
+    Arguments:
+        train_df (Series): contains columns context and response
+        eval_df (Series): ^
+        train_bow (array): matrix with shape (num_train_examples, vocab_size)
+        eval_bow (array): ^
+        output_name (str): root name of all outputs
+    '''
 
-    max_train_indices = overlap_bow.argmax(axis=0)
-    max_overlap = overlap_bow[max_train_indices, range(eval_bow.shape[0])]
-    max_train_len = train_len[max_train_indices]
-    total_len = max_train_len + eval_len
+    scores, max_overlap_indices = preprocess_utils.compute_scores(train_bow, eval_bow)
 
-    scores = max_overlap / (total_len)
+    # Plot a histogram of test scores
+    # TODO: produce cumulative graphs as well
+    plt.hist(scores)
+    plt.savefig('{}_scores.png'.format(output_name))
+    plt.close()
 
-    return scores
+    for threshold in [0.00, 0.25, 0.50, 0.75, 1.00]:
+        drop_indices = (scores > threshold).nonzero()[0]
+        print('[{}]: Dropping {} samples for scores>{}'.format(
+            output_name,
+            len(drop_indices),
+            threshold,
+        ))
+        dropped_df = eval_df.drop(drop_indices)
+        dropped_df.to_csv('{}_threshold_{}.csv'.format(output_name, threshold), index=False)
+
+    compare_df = pd.DataFrame({
+        'score': scores,
+        'train_context': train_df['context'][max_overlap_indices].reset_index(drop=True),
+        'train_response': train_df['response'][max_overlap_indices].reset_index(drop=True),
+        'eval_context': eval_df['context'].reset_index(drop=True),
+        'eval_response': eval_df['response'].reset_index(drop=True),
+    })
+    compare_df.sort_values('score', inplace=True)
+    compare_df.to_csv('{}_compare.csv'.format(output_name))
+
+    return
+
 
 if __name__ == '__main__':
 
-    train_df = pd.read_csv('data/hareesh/df_daily_train.csv')
-    test_df = pd.read_csv('data/hareesh/df_daily_test_without_duplicates.csv')
-    valid_df = pd.read_csv('data/hareesh/df_daily_valid_without_duplicates.csv')
+    train_df = flatten('../../data/ijcnlp_dailydialog/train/dialogues_train.txt')
+    test_df = flatten('../..//data/ijcnlp_dailydialog/test/dialogues_test.txt')
+    valid_df = flatten('../../data/ijcnlp_dailydialog/validation/dialogues_validation.txt')
 
     dfs = [train_df, test_df, valid_df]
-    # dfs = [valid_df]
 
-    sw = stopwords.words('english')
-
-    # build the counter
+    # Build the counter
     counter = Counter()
     for df in dfs:
         for idx, row in tqdm(df.iterrows(), total=df.shape[0]):
-
-            line = row['line'] + ' ' + row['reply']
+            line = row['context'] + ' ' + row['response']
+            line = preprocess_utils.preprocess_str(line)
             tokens = wordpunct_tokenize(line)
-
             for token in tokens:
-                if token in string.punctuation or token in sw:
-                    continue
-                else:
-                    counter[token] += 1
-
+                counter[token] += 1
     vocab_size = len(counter)
 
-    # build w2i
+    # Build w2i
     w2i = dict()
     idx = 0
     for w in counter:
@@ -109,16 +129,11 @@ if __name__ == '__main__':
     valid_bow = df2bow(valid_df, w2i)
     test_bow = df2bow(test_df, w2i)
 
-    test_score = get_score(train_bow, test_bow)
+    print('vocab_size:', len(w2i))
 
-    test_drop_indices = (test_score > 0.30).nonzero()[0]
-    print('Dropping {} samples from test'.format(len(test_drop_indices)))
+    # ---------- Test Set ----------
 
-    plt.hist(test_score)
-    plt.savefig('test_score.png')
-    plt.close()
-
-    test_dedup_df = test_df.drop(test_drop_indices)
-    test_dedup_df.to_csv('dedup_0.30_test.csv', index=False)
+    clean_and_dump(train_df, train_bow, test_df, test_bow, 'test')
+    clean_and_dump(train_df, train_bow, valid_df, valid_bow, 'valid')
 
     print(valid_bow)
