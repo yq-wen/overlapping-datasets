@@ -55,6 +55,46 @@ def compute_scores(train_bow, eval_bow):
 
     return scores, max_overlap_indices
 
+def compute_bz_scores(train_bow, eval_bow):
+
+    '''
+    Arguments:
+        train_bow (numpy array): bag of words representation for the training
+            samples. (shape: (num_train_samples, vocab_size))
+        eval_bow (numpy array): bag of words representations for evaluation
+            samples to deduplicate. (shape: (num_eval_samples, vocab_size))
+    Return:
+        scores (numpy array): overlap scores for each evaluation sample.
+            (shape: (num_eval_samples,))
+        max_overlap_indices (numpy array): indices of the training samples that
+            generated the maximum overlap. (shape: (num_eval_samples,))
+    '''
+    epoch=math.ceil(train_bow.shape[0]/bz)
+    train_len = train_bow.sum(axis=1)
+    eval_len = eval_bow.sum(axis=1)
+    total_overlap_indices=np.zeros((epoch, eval_bow.shape[0]))
+    total_max_overlap=np.zeros((epoch, eval_bow.shape[0]))
+
+    for ep in range(epoch):
+        print("epoch {}".format(ep))
+        train_bow_bz=train_bow[ep*bz:(ep+1)*bz,:]
+
+        overlap_bow = train_bow_bz @ eval_bow.T  # (train_size, eval_size)
+
+        max_overlap_indices = overlap_bow.argmax(axis=0)
+        max_overlap = overlap_bow[max_overlap_indices, range(eval_bow.shape[0])]
+        total_overlap_indices[ep:ep+1,:]=np.copy(max_overlap_indices+ep*bz)
+        total_max_overlap[ep:ep+1,:]=np.copy(max_overlap)
+
+    final_max_overlap=total_max_overlap.max(axis=0)
+    index=total_max_overlap.argmax(axis=0)
+    final_overlap_indices=total_overlap_indices[index, range(eval_bow.shape[0])].astype(int)
+
+    max_train_len = train_len[final_overlap_indices]
+    total_len = max_train_len + eval_len
+    scores = 2 * final_max_overlap / (total_len)
+
+    return scores, final_overlap_indices
 
 def clean_and_dump(train_df, train_bow, eval_df, eval_bow, output_name):
     '''
