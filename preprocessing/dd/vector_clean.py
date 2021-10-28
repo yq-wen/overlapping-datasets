@@ -61,19 +61,33 @@ def df2bow(df, w2i):
 def clean_and_dump(train_df, train_bow, eval_df, eval_bow, output_name):
     '''
     Arguments:
-        train_df (Series): contains columns context and response
-        eval_df (Series): ^
+        train_df (Series): contains columns for context and response
+        eval_df (Series): contains columns for context and response
         train_bow (array): matrix with shape (num_train_examples, vocab_size)
-        eval_bow (array): ^
+        eval_bow (array): matrix with shape (num_eval_examples, vocab_size)
         output_name (str): root name of all outputs
     '''
 
     scores, max_overlap_indices = preprocess_utils.compute_scores(train_bow, eval_bow)
 
-    # Plot a histogram of test scores
-    # TODO: produce cumulative graphs as well
-    plt.hist(scores)
+    # ----- Plots -----
+    bin_width = 0.05
+    bins = numpy.arange(0.0, 1.0 + bin_width, bin_width)
+
+    # Plot a histogram of scores
+    plt.hist(scores, bins=bins)
+    plt.title('Word Overlap Distribution')
+    plt.xlabel('fraction of word overlap')
+    plt.ylabel('number of overlapped pairs'.format(output_name))
     plt.savefig('{}_scores.png'.format(output_name))
+    plt.close()
+
+    # Plot a cumulative graph of scores
+    plt.hist(scores, cumulative=True, density=True, bins=bins)
+    plt.title('Cumulative Word Overlap distribution')
+    plt.xlabel('fraction of word overlap')
+    plt.ylabel('cumulative fraction of the overlapped pairs')
+    plt.savefig('{}_cumulative_scores.png'.format(output_name))
     plt.close()
 
     for threshold in [0.00, 0.25, 0.50, 0.75, 1.00]:
