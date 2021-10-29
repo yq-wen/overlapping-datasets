@@ -122,6 +122,87 @@ def eval_model(tests, model, tokenizer, generate_func=generate_fn, stream=None):
         else:
             print(*args)
 
+    def calc_results(
+        sent_bleu_1s,
+        sent_bleu_2s,
+        sent_bleu_3s,
+        sent_bleu_4s,
+        sent_ibleu_1s,
+        sent_ibleu_2s,
+        sent_ibleu_3s,
+        sent_ibleu_4s,
+        corp_refs,
+        corp_model_hyps,
+        prefix_str='',
+    ):
+
+        # print(i_corpus_bleu(corp_refs, corp_best_hyps, corp_inps))
+        _log('sent_bleus (1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
+            statistics.mean(sent_bleu_1s),
+            statistics.mean(sent_bleu_2s),
+            statistics.mean(sent_bleu_3s),
+            statistics.mean(sent_bleu_4s),
+        ))
+        _log('sent_ibleus (1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
+            statistics.mean(sent_ibleu_1s),
+            statistics.mean(sent_ibleu_2s),
+            statistics.mean(sent_ibleu_3s),
+            statistics.mean(sent_ibleu_4s),
+        ))
+        _log()
+
+        corp_model_bleu1 = corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[0])
+        corp_model_bleu = corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[3])
+        _log('corp_model_bleus(1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
+            corp_model_bleu1,
+            corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[1]),
+            corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[2]),
+            corp_model_bleu,
+        ))
+
+        corp_model_ibleu1 = i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[0])
+        corp_model_ibleu = i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[3])
+        _log('corp_model_ibleus(1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
+            corp_model_ibleu1,
+            i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[1]),
+            i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[2]),
+            corp_model_ibleu,
+        ))
+        _log()
+
+        corp_best_bleu = corpus_bleu(corp_refs, corp_best_hyps, weights=BLEU_WEIGHTS_MEAN[3])
+        _log('corp_best_bleus(1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
+            corpus_bleu(corp_refs, corp_best_hyps, weights=BLEU_WEIGHTS_MEAN[0]),
+            corpus_bleu(corp_refs, corp_best_hyps, weights=BLEU_WEIGHTS_MEAN[1]),
+            corpus_bleu(corp_refs, corp_best_hyps, weights=BLEU_WEIGHTS_MEAN[2]),
+            corp_best_bleu,
+        ))
+        corp_best_ibleu = i_corpus_bleu(corp_refs, corp_best_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[3])
+        _log('corp_best_ibleus(1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
+            i_corpus_bleu(corp_refs, corp_best_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[0]),
+            i_corpus_bleu(corp_refs, corp_best_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[1]),
+            i_corpus_bleu(corp_refs, corp_best_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[2]),
+            corp_best_ibleu,
+        ))
+
+        tokens = [token for sentence in corp_model_hyps for token in sentence]
+        dist_1, dist_2 = calculate_ngram_diversity(tokens)
+        _log('dist_1: {:.5f}, dist_2: {:.5f}'.format(dist_1, dist_2))
+
+        _log()
+
+        # eval_ as prefix for huggingface logger to understand that this is eval...
+        return {
+            '{}corp_model_bleu1'.format(prefix_str): corp_model_bleu1,
+            '{}corp_model_bleu'.format(prefix_str): corp_model_bleu,
+            '{}corp_model_ibleu1'.format(prefix_str): corp_model_ibleu1,
+            '{}corp_model_ibleu'.format(prefix_str): corp_model_ibleu,
+            '{}corp_best_bleu'.format(prefix_str): corp_best_bleu,
+            '{}corp_best_ibleu'.format(prefix_str): corp_best_ibleu,
+            '{}dist_1'.format(prefix_str): dist_1,
+            '{}dist_2'.format(prefix_str): dist_2,
+        }
+
     chosen_count = np.zeros(1)
 
     sent_bleu_1s  = []
@@ -140,11 +221,15 @@ def eval_model(tests, model, tokenizer, generate_func=generate_fn, stream=None):
     corp_model_hyps = []  # List[List(str)], list of hypothesis (list of chars)
     corp_best_hyps = []  # List[List(str)], list of hypothesis (list of chars)
 
+    overlap_scores = []
+
     num_posts = len(test_dict)
 
     for i in range(num_posts):
 
         score, context, reference_responses = tests[i]
+
+        overlap_scores.append(score)
 
         generated_responses, self_ppls = generate_func(model, tokenizer, context)
 
@@ -213,72 +298,18 @@ def eval_model(tests, model, tokenizer, generate_func=generate_fn, stream=None):
 
     _log('---------- Results ----------')
 
-    # print(i_corpus_bleu(corp_refs, corp_best_hyps, corp_inps))
-    _log('sent_bleus (1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
-        statistics.mean(sent_bleu_1s),
-        statistics.mean(sent_bleu_2s),
-        statistics.mean(sent_bleu_3s),
-        statistics.mean(sent_bleu_4s),
-    ))
-    _log('sent_ibleus (1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
-        statistics.mean(sent_ibleu_1s),
-        statistics.mean(sent_ibleu_2s),
-        statistics.mean(sent_ibleu_3s),
-        statistics.mean(sent_ibleu_4s),
-    ))
-    _log()
-
-    corp_model_bleu1 = corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[0])
-    corp_model_bleu = corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[3])
-    _log('corp_model_bleus(1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
-        corp_model_bleu1,
-        corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[1]),
-        corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[2]),
-        corp_model_bleu,
-    ))
-
-    corp_model_ibleu1 = i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[0])
-    corp_model_ibleu = i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[3])
-    _log('corp_model_ibleus(1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
-        corp_model_ibleu1,
-        i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[1]),
-        i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[2]),
-        corp_model_ibleu,
-    ))
-    _log()
-
-    corp_best_bleu = corpus_bleu(corp_refs, corp_best_hyps, weights=BLEU_WEIGHTS_MEAN[3])
-    _log('corp_best_bleus(1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
-        corpus_bleu(corp_refs, corp_best_hyps, weights=BLEU_WEIGHTS_MEAN[0]),
-        corpus_bleu(corp_refs, corp_best_hyps, weights=BLEU_WEIGHTS_MEAN[1]),
-        corpus_bleu(corp_refs, corp_best_hyps, weights=BLEU_WEIGHTS_MEAN[2]),
-        corp_best_bleu,
-    ))
-    corp_best_ibleu = i_corpus_bleu(corp_refs, corp_best_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[3])
-    _log('corp_best_ibleus(1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
-        i_corpus_bleu(corp_refs, corp_best_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[0]),
-        i_corpus_bleu(corp_refs, corp_best_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[1]),
-        i_corpus_bleu(corp_refs, corp_best_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[2]),
-        corp_best_ibleu,
-    ))
-
-    tokens = [token for sentence in corp_model_hyps for token in sentence]
-    dist_1, dist_2 = calculate_ngram_diversity(tokens)
-    _log('dist_1: {:.5f}, dist_2: {:.5f}'.format(dist_1, dist_2))
-
-    _log()
-
-    # eval_ as prefix for huggingface logger to understand that this is eval...
-    return {
-        'corp_model_bleu1': corp_model_bleu1,
-        'corp_model_bleu': corp_model_bleu,
-        'corp_model_ibleu1': corp_model_ibleu1,
-        'corp_model_ibleu': corp_model_ibleu,
-        'corp_best_bleu': corp_best_bleu,
-        'corp_best_ibleu': corp_best_ibleu,
-        'dist_1': dist_1,
-        'dist_2': dist_2,
-    }
+    return calc_results(
+        sent_bleu_1s,
+        sent_bleu_2s,
+        sent_bleu_3s,
+        sent_bleu_4s,
+        sent_ibleu_1s,
+        sent_ibleu_2s,
+        sent_ibleu_3s,
+        sent_ibleu_4s,
+        corp_refs,
+        corp_model_hyps,
+    )
 
 if __name__ == '__main__':
 
