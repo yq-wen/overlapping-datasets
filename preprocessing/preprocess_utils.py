@@ -1,12 +1,13 @@
 import string
-import numpy
-
+import numpy as np
+import math
 import pandas as pd
 import matplotlib.pyplot as plt
 
 from nltk.corpus import stopwords
 from nltk import wordpunct_tokenize
-
+import nltk
+nltk.download('stopwords')
 
 stopword_set = set(stopwords.words('english'))
 
@@ -40,8 +41,8 @@ def compute_score_matrix(bow_1, bow_2):
     bow_2_len = bow_2.sum(axis=1)  # (num_bow_2_samples,)
 
     # len_matrics all have shape: (num_bow_1_samples, num_bow_2_samples)
-    bow_1_len_matrix = numpy.broadcast_to(bow_1_len, (num_2_bow_samples, num_1_bow_samples)).T
-    bow_2_len_matrix = numpy.broadcast_to(bow_2_len, (num_1_bow_samples, num_2_bow_samples))
+    bow_1_len_matrix = np.broadcast_to(bow_1_len, (num_2_bow_samples, num_1_bow_samples)).T
+    bow_2_len_matrix = np.broadcast_to(bow_2_len, (num_1_bow_samples, num_2_bow_samples))
     total_len_matrix = bow_1_len_matrix + bow_2_len_matrix
 
     overlap_matrix = bow_1 @ bow_2.T  # (num_bow_1_samples, num_bow_2_samples)
@@ -49,7 +50,7 @@ def compute_score_matrix(bow_1, bow_2):
 
     # nans happen where both sentences contain only punctuations
     # therefore, consider them to be an exact overlap
-    numpy.nan_to_num(score_matrix, copy=False, nan=1.0)
+    np.nan_to_num(score_matrix, copy=False, nan=1.0)
 
     return score_matrix
 
@@ -79,7 +80,7 @@ def compute_scores(train_bow, eval_bow):
 
     scores = 2 * max_overlap / (total_len)
 
-    return scores, max_overlap_indices
+    return scores, max_overlap_indices,max_overlap
 
 def compute_bz_scores(train_bow, eval_bow):
 
@@ -95,6 +96,7 @@ def compute_bz_scores(train_bow, eval_bow):
         max_overlap_indices (numpy array): indices of the training samples that
             generated the maximum overlap. (shape: (num_eval_samples,))
     '''
+    bz=30000
     epoch=math.ceil(train_bow.shape[0]/bz)
     train_len = train_bow.sum(axis=1)
     eval_len = eval_bow.sum(axis=1)
@@ -103,13 +105,9 @@ def compute_bz_scores(train_bow, eval_bow):
 
     for ep in range(epoch):
         print("epoch {}".format(ep))
-        train_bow_bz=train_bow[ep*bz:(ep+1)*bz,:]
-
-        overlap_bow = train_bow_bz @ eval_bow.T  # (train_size, eval_size)
-
-        max_overlap_indices = overlap_bow.argmax(axis=0)
-        max_overlap = overlap_bow[max_overlap_indices, range(eval_bow.shape[0])]
-        total_overlap_indices[ep:ep+1,:]=np.copy(max_overlap_indices+ep*bz)
+        train_bow_bz = train_bow[ep * bz:(ep + 1) * bz, :]
+        _, max_overlap_indices, max_overlap= compute_scores(train_bow_bz,eval_bow)
+        total_overlap_indices[ep:ep + 1, :] = np.copy(max_overlap_indices + ep * bz)
         total_max_overlap[ep:ep+1,:]=np.copy(max_overlap)
 
     final_max_overlap=total_max_overlap.max(axis=0)
@@ -120,7 +118,44 @@ def compute_bz_scores(train_bow, eval_bow):
     total_len = max_train_len + eval_len
     scores = 2 * final_max_overlap / (total_len)
 
-    return scores, final_overlap_indices
+    return scores, final_overlap_indices, final_max_overlap
+
+def compute_bz_scores_sep(train_context_bow, train_response_bow, eval_context_bow, eval_response_bow):
+    '''Computes the score for context and response seperately
+    Arguments:
+        bows (numpy array): bag of words representation (num_samples, vocab_size)
+    Returns:
+        scores (numpy array): overlap scores for each evaluation sample.
+            (shape: (num_eval_samples,))
+        max_overlap_indices (numpy array): indices of the training samples that
+            generated the maximum overlap. (shape: (num_eval_samples,))
+    '''
+    bz = 5000
+    epoch = math.ceil(train_context_bow.shape[0] / bz)
+    total_max_overlap_indices=np.zeros((epoch,eval_response_bow.shape[0]))
+    total_score=np.zeros((epoch,eval_response_bow.shape[0]))
+
+    for ep in range(epoch):
+        if ep%10==0:
+            print("epoch {}".format(ep))
+        train_context_bow_bz = train_context_bow[ep * bz:(ep + 1) * bz, :]
+        train_response_bow_bz= train_response_bow[ep * bz:(ep + 1) * bz, :]
+        context_score_matrix = compute_score_matrix(train_context_bow_bz, eval_context_bow)
+        response_score_matrix = compute_score_matrix(train_response_bow_bz, eval_response_bow)
+
+        # score_matrix  = (context_score_matrix + response_score_matrix) / 2
+        score_matrix  = np.minimum(context_score_matrix, response_score_matrix)
+        max_overlap_indices = score_matrix.argmax(axis=0)
+        scores = score_matrix[max_overlap_indices, range(score_matrix.shape[1])]
+
+        total_max_overlap_indices[ep:ep+1]=np.copy(max_overlap_indices+ep*bz)
+        total_score[ep:ep+1]=np.copy(scores)
+
+    final_scores = total_score.max(axis=0)
+    index = total_score.argmax(axis=0)
+    final_overlap_indices = total_max_overlap_indices[index, range(eval_context_bow.shape[0])].astype(int)
+
+    return final_scores, final_overlap_indices
 
 def compute_scores_sep(train_context_bow, train_response_bow, eval_context_bow, eval_response_bow):
     '''Computes the score for context and response seperately
@@ -136,18 +171,19 @@ def compute_scores_sep(train_context_bow, train_response_bow, eval_context_bow, 
     response_score_matrix = compute_score_matrix(train_response_bow, eval_response_bow)
 
     # score_matrix  = (context_score_matrix + response_score_matrix) / 2
-    score_matrix  = numpy.minimum(context_score_matrix, response_score_matrix)
+    score_matrix  = np.minimum(context_score_matrix, response_score_matrix)
 
     max_overlap_indices = score_matrix.argmax(axis=0)
     scores = score_matrix[max_overlap_indices, range(score_matrix.shape[1])]
 
     return scores, max_overlap_indices
 
+
 def dump_results(train_df, eval_df, scores, max_overlap_indices, output_name):
 
     # ----- Plots -----
     bin_width = 0.05
-    bins = numpy.arange(0.0, 1.0 + bin_width, bin_width)
+    bins = np.arange(0.0, 1.0 + bin_width, bin_width)
 
     # Plot a histogram of scores
     plt.hist(scores, bins=bins)
@@ -198,7 +234,7 @@ def clean_and_dump(train_df, train_bow, eval_df, eval_bow, output_name):
         output_name (str): root name of all outputs
     '''
 
-    scores, max_overlap_indices = compute_scores(train_bow, eval_bow)
+    scores, max_overlap_indices, _ = compute_scores(train_bow, eval_bow)
     dump_results(train_df, eval_df, scores, max_overlap_indices, output_name)
 
 if __name__ == '__main__':
