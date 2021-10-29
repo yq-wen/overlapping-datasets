@@ -196,7 +196,12 @@ class BaseTrainer():
 class T5Trainer(BaseTrainer):
 
     def __init__(self, *args, eval_every=1, **kwargs):
+
         self.eval_every = eval_every
+
+        self.best_metrics = {}  # map from metric (str) to the best value (float)
+        self.best_path    = {}  # map from metric (str) to the path of ckpt (str)
+
         return super().__init__(*args, **kwargs)
 
     def compute_loss(self, batch):
@@ -219,6 +224,26 @@ class T5Trainer(BaseTrainer):
                 print('{}: {}'.format(k, v))
                 self.writer.add_scalar(k, v, self.global_step)
 
+            # saving the best ckpt
+            for k, v in results.items():
+
+                save = False
+
+                # initialization
+                if k not in self.best_metrics or k not in self.best_path:
+                    save = True
+                else:
+                    save = v > self.best_metrics[k]
+                    # remove previous ckpt
+                    if save:
+                        self.best_path[k].unlink()
+
+                if save:
+                    self.best_metrics[k] = v
+                    save_name = 'best_{}_epoch_{}.pt'.format(k, self.epoch)
+                    save_path = pathlib.PosixPath(self.log_dir, save_name)
+                    torch.save(self.model, save_path)
+                    self.best_path[k] = save_path
 
 if __name__ == '__main__':
 
