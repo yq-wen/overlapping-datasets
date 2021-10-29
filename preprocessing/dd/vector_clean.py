@@ -57,6 +57,31 @@ def df2bow(df, w2i):
 
     return bow
 
+def df2bows(df, w2i):
+
+    num_examples = df.shape[0]
+    vocab_size = len(w2i)
+
+    context_bow = numpy.zeros((num_examples, vocab_size))
+    response_bow = numpy.zeros((num_examples, vocab_size))
+
+    for idx, row in tqdm(df.iterrows(), total=df.shape[0]):
+
+        # context
+        line = row['context']
+        line = preprocess_utils.preprocess_str(line)
+        tokens = wordpunct_tokenize(line)
+        for token in tokens:
+            context_bow[idx, w2i[token]] = 1
+
+        # response
+        line = row['response']
+        line = preprocess_utils.preprocess_str(line)
+        tokens = wordpunct_tokenize(line)
+        for token in tokens:
+            response_bow[idx, w2i[token]] = 1
+
+    return context_bow, response_bow
 
 if __name__ == '__main__':
 
@@ -84,13 +109,21 @@ if __name__ == '__main__':
         w2i[w] = idx
         idx += 1
 
-    train_bow = df2bow(train_df, w2i)
-    valid_bow = df2bow(valid_df, w2i)
-    test_bow = df2bow(test_df, w2i)
+    train_context_bow, train_response_bow = df2bows(train_df, w2i)
+    valid_context_bow, valid_response_bow = df2bows(valid_df, w2i)
+    test_context_bow, test_response_bow   = df2bows(test_df, w2i)
 
     print('vocab_size:', len(w2i))
 
-    # ---------- Test Set ----------
+    valid_scores, valid_max_overlap_indices = preprocess_utils.compute_scores_sep(
+        train_context_bow, train_response_bow,
+        valid_context_bow, valid_response_bow,
+    )
 
-    preprocess_utils.clean_and_dump(train_df, train_bow, test_df, test_bow, 'test')
-    preprocess_utils.clean_and_dump(train_df, train_bow, valid_df, valid_bow, 'valid')
+    test_scores, test_max_overlap_indices = preprocess_utils.compute_scores_sep(
+        train_context_bow, train_response_bow,
+        test_context_bow, test_response_bow,
+    )
+
+    preprocess_utils.dump_results(train_df, valid_df, valid_scores, valid_max_overlap_indices, 'valid')
+    preprocess_utils.dump_results(train_df, test_df, test_scores, test_max_overlap_indices, 'test')
