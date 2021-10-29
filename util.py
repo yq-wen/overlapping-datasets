@@ -2,7 +2,7 @@ import argparse
 import random
 import pandas as pd
 
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 from transformers import AutoTokenizer
 
 def build_dd_test_dict(
@@ -60,6 +60,30 @@ def build_dd_test_dict_from_csv(
             break
 
     return test_dict
+
+def build_dd_tests_from_csv(
+    path=None,
+    max_num_dialogues=None,
+    seed=0,
+):
+    Test = namedtuple('Test', ['score', 'context', 'responses'])
+    tests = []
+
+    df = pd.read_csv(path)
+
+    num_dialogues = len(df.index)
+    if max_num_dialogues:
+        df = df.sample(frac=1, random_state=seed).reset_index(drop=True)
+        num_dialogues = min(max_num_dialogues, num_dialogues)
+
+    for index, row in df.iterrows():
+        if index < num_dialogues:
+            test = Test(row['score'], row['eval_context'], [row['eval_response']])
+            tests.append(test)
+        else:
+            break
+
+    return tests
 
 if __name__ == '__main__':
 

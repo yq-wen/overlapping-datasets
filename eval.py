@@ -9,7 +9,7 @@ import itertools
 from nltk.translate.bleu_score import sentence_bleu, corpus_bleu
 from metric.bleus import i_sentence_bleu, i_corpus_bleu
 from transformers import AutoTokenizer
-from util import build_dd_test_dict_from_csv
+from util import build_dd_tests_from_csv
 from nltk.collocations import BigramCollocationFinder
 from nltk.probability import FreqDist
 from nltk import word_tokenize
@@ -105,10 +105,11 @@ def calculate_ngram_diversity(corpus):
 
     return uni_diversity, bi_diversity
 
-def eval_model(test_dict, model, tokenizer, generate_func=generate_fn, stream=None):
+def eval_model(tests, model, tokenizer, generate_func=generate_fn, stream=None):
     '''
     Arguments:
-        test_dict (dict): post (str) -> responses (list<str>)
+        test_dict (list): a list of namedtuples, each containing score (float),
+            context (str), and a list of responses (str)
         generate_func (lambda): function that takes a post (str) as input
             and generates a list of responses (list<str>) and their confidences (float)
     Return:
@@ -141,11 +142,13 @@ def eval_model(test_dict, model, tokenizer, generate_func=generate_fn, stream=No
 
     num_posts = len(test_dict)
 
-    for i, (post, reference_responses) in enumerate(test_dict.items()):
+    for i in range(num_posts):
 
-        generated_responses, self_ppls = generate_func(model, tokenizer, post)
+        score, context, reference_responses = tests[i]
 
-        inp = str_tokenize(post)
+        generated_responses, self_ppls = generate_func(model, tokenizer, context)
+
+        inp = str_tokenize(context)
         corp_inps.append(inp)
 
         ref = list(map(lambda x: str_tokenize(x), reference_responses))
@@ -160,7 +163,7 @@ def eval_model(test_dict, model, tokenizer, generate_func=generate_fn, stream=No
         best_response = ''
         highest_bleu = -1
 
-        _log('{}/{} - Post: {}'.format(i, num_posts - 1, ' '.join(inp)))
+        _log('{}/{} - overlap: {:.2f} - Post: {}'.format(i, num_posts - 1, score, ' '.join(inp)))
 
         # ----- deal with generated response for each decoder -----
         for j in range(len(generated_responses)):
@@ -198,7 +201,7 @@ def eval_model(test_dict, model, tokenizer, generate_func=generate_fn, stream=No
                 model_response = generated_response
                 chosen_idx = j
 
-            _log('Decoder {}, bleu={:.5f}, self_ppl={:9.2f}: {}'.format(j, bleu, self_ppl, generated_response))
+            _log('Response #{}, bleu={:.5f}, self_ppl={:9.2f}: {}'.format(j, bleu, self_ppl, generated_response))
             _log('Ref Response: {}'.format(reference_responses[0]))
 
         chosen_count[chosen_idx] += 1
@@ -282,7 +285,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser('Script for evaluating models')
     parser.add_argument('--ckpt', type=str, default='')
     parser.add_argument('--output-file', type=str, default='')
-    parser.add_argument('--test-dict-path', type=str, default='data/hareesh/df_daily_test_without_duplicates.csv')
+    parser.add_argument('--test-dict-path', type=str, default='preprocessing/dd/cleaned/clean_v4_2_sep_min_nsw/test_compare.csv')
     parser.add_argument('--max-num-dialogues', type=int, default=sys.maxsize)
 
     args = parser.parse_args()
@@ -292,7 +295,7 @@ if __name__ == '__main__':
 
     tokenizer = AutoTokenizer.from_pretrained("t5-base")
 
-    test_dict = build_dd_test_dict_from_csv(
+    test_dict = build_dd_tests_from_csv(
         path=args.test_dict_path,
         max_num_dialogues=args.max_num_dialogues,
     )
