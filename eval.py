@@ -157,38 +157,27 @@ def eval_model(tests, model, tokenizer, generate_func=generate_fn, thresholds=[1
         _log()
 
         corp_model_bleu1 = corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[0])
-        corp_model_bleu = corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[3])
+        corp_model_bleu2 = corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[1])
+        corp_model_bleu3 = corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[2])
+        corp_model_bleu4 = corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[3])
         _log('corp_model_bleus(1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
             corp_model_bleu1,
-            corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[1]),
-            corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[2]),
-            corp_model_bleu,
+            corp_model_bleu2,
+            corp_model_bleu3,
+            corp_model_bleu4,
         ))
 
         corp_model_ibleu1 = i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[0])
-        corp_model_ibleu = i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[3])
+        corp_model_ibleu2 = i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[1])
+        corp_model_ibleu3 = i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[2])
+        corp_model_ibleu4 = i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[3])
         _log('corp_model_ibleus(1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
             corp_model_ibleu1,
-            i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[1]),
-            i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[2]),
-            corp_model_ibleu,
+            corp_model_ibleu2,
+            corp_model_ibleu3,
+            corp_model_ibleu4,
         ))
         _log()
-
-        corp_best_bleu = corpus_bleu(corp_refs, corp_best_hyps, weights=BLEU_WEIGHTS_MEAN[3])
-        _log('corp_best_bleus(1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
-            corpus_bleu(corp_refs, corp_best_hyps, weights=BLEU_WEIGHTS_MEAN[0]),
-            corpus_bleu(corp_refs, corp_best_hyps, weights=BLEU_WEIGHTS_MEAN[1]),
-            corpus_bleu(corp_refs, corp_best_hyps, weights=BLEU_WEIGHTS_MEAN[2]),
-            corp_best_bleu,
-        ))
-        corp_best_ibleu = i_corpus_bleu(corp_refs, corp_best_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[3])
-        _log('corp_best_ibleus(1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
-            i_corpus_bleu(corp_refs, corp_best_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[0]),
-            i_corpus_bleu(corp_refs, corp_best_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[1]),
-            i_corpus_bleu(corp_refs, corp_best_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[2]),
-            corp_best_ibleu,
-        ))
 
         tokens = [token for sentence in corp_model_hyps for token in sentence]
         dist_1, dist_2 = calculate_ngram_diversity(tokens)
@@ -199,11 +188,13 @@ def eval_model(tests, model, tokenizer, generate_func=generate_fn, thresholds=[1
         # eval_ as prefix for huggingface logger to understand that this is eval...
         return {
             '{}corp_model_bleu1'.format(prefix_str): corp_model_bleu1,
-            '{}corp_model_bleu'.format(prefix_str): corp_model_bleu,
+            '{}corp_model_bleu2'.format(prefix_str): corp_model_bleu2,
+            '{}corp_model_bleu3'.format(prefix_str): corp_model_bleu3,
+            '{}corp_model_bleu4'.format(prefix_str): corp_model_bleu4,
             '{}corp_model_ibleu1'.format(prefix_str): corp_model_ibleu1,
-            '{}corp_model_ibleu'.format(prefix_str): corp_model_ibleu,
-            '{}corp_best_bleu'.format(prefix_str): corp_best_bleu,
-            '{}corp_best_ibleu'.format(prefix_str): corp_best_ibleu,
+            '{}corp_model_ibleu2'.format(prefix_str): corp_model_ibleu2,
+            '{}corp_model_ibleu3'.format(prefix_str): corp_model_ibleu3,
+            '{}corp_model_ibleu4'.format(prefix_str): corp_model_ibleu4,
             '{}dist_1'.format(prefix_str): dist_1,
             '{}dist_2'.format(prefix_str): dist_2,
         }
@@ -333,7 +324,7 @@ def eval_model(tests, model, tokenizer, generate_func=generate_fn, thresholds=[1
             list_drop_indices(corp_refs, drop_indices),
             list_drop_indices(corp_model_hyps, drop_indices),
             list_drop_indices(corp_best_hyps, drop_indices),
-            prefix_str='threshold_{}/'.format(threshold)
+            prefix_str='threshold_{:.2f}/'.format(threshold)
         )
         for k, v in results.items():
             final_results[k] = v

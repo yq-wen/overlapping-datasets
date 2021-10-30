@@ -216,6 +216,19 @@ class T5Trainer(BaseTrainer):
 
     def epoch_end(self):
 
+        def _is_save_metric(metric_str):
+            if 'corp_model_bleu1' in metric_str:
+                return True
+            if 'corp_model_ibleu1' in metric_str:
+                return True
+            if 'corp_model_bleu4' in metric_str:
+                return True
+            if 'corp_model_ibleu4' in metric_str:
+                return True
+            if 'dist_2' in metric_str:
+                return True
+            return False
+
         if self.epoch % self.eval_every == 0:
 
             with open(pathlib.PosixPath(self.log_dir, '_epoch_{}.pt.eval'.format(self.epoch)), mode='w') as f:
@@ -231,23 +244,25 @@ class T5Trainer(BaseTrainer):
 
                 save = False
 
-                # initialization
-                if k not in self.best_metrics or k not in self.best_path:
-                    save = True
-                else:
-                    save = v > self.best_metrics[k]
-                    # remove previous ckpt
-                    if save:
-                        self.best_path[k].unlink()
+                if _is_save_metric(k):
 
-                if save:
-                    self.best_metrics[k] = v
-                    save_name = 'best_{}_epoch_{}.pt'.format(k, self.epoch)
-                    # / for organizing tensorboard, but can't use / for save path
-                    save_name = save_name.replace('/', '_')
-                    save_path = pathlib.PosixPath(self.log_dir, save_name)
-                    torch.save(self.model, save_path)
-                    self.best_path[k] = save_path
+                    # initialization
+                    if k not in self.best_metrics or k not in self.best_path:
+                        save = True
+                    else:
+                        save = v > self.best_metrics[k]
+                        # remove previous ckpt
+                        if save:
+                            self.best_path[k].unlink()
+
+                    if save:
+                        self.best_metrics[k] = v
+                        save_name = 'best_{}_epoch_{}.pt'.format(k, self.epoch)
+                        # / for organizing tensorboard, but can't use / for save path
+                        save_name = save_name.replace('/', '_')
+                        save_path = pathlib.PosixPath(self.log_dir, save_name)
+                        torch.save(self.model, save_path)
+                        self.best_path[k] = save_path
 
 if __name__ == '__main__':
 
