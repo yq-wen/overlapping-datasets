@@ -32,6 +32,9 @@ BLEU_WEIGHTS_SINGLE = [
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
+def list_drop_indices(input_list, drop_indices):
+    return [item for idx, item in enumerate(input_list) if idx not in drop_indices]
+
 def str_tokenize(sent):
     '''Given a sentence (str), return a list of tokenized characters
     '''
@@ -105,7 +108,7 @@ def calculate_ngram_diversity(corpus):
 
     return uni_diversity, bi_diversity
 
-def eval_model(tests, model, tokenizer, generate_func=generate_fn, stream=None):
+def eval_model(tests, model, tokenizer, generate_func=generate_fn, thresholds=[1.0], stream=None):
     '''
     Arguments:
         test_dict (list): a list of namedtuples, each containing score (float),
@@ -131,8 +134,10 @@ def eval_model(tests, model, tokenizer, generate_func=generate_fn, stream=None):
         sent_ibleu_2s,
         sent_ibleu_3s,
         sent_ibleu_4s,
+        corp_inps,
         corp_refs,
         corp_model_hyps,
+        corp_best_hyps,
         prefix_str='',
     ):
 
@@ -203,6 +208,8 @@ def eval_model(tests, model, tokenizer, generate_func=generate_fn, stream=None):
             '{}dist_2'.format(prefix_str): dist_2,
         }
 
+    final_results = {}
+
     chosen_count = np.zeros(1)
 
     sent_bleu_1s  = []
@@ -221,15 +228,15 @@ def eval_model(tests, model, tokenizer, generate_func=generate_fn, stream=None):
     corp_model_hyps = []  # List[List(str)], list of hypothesis (list of chars)
     corp_best_hyps = []  # List[List(str)], list of hypothesis (list of chars)
 
-    overlap_scores = []
-
     num_posts = len(test_dict)
+
+    overlap_scores = np.zeros(num_posts)
 
     for i in range(num_posts):
 
         score, context, reference_responses = tests[i]
 
-        overlap_scores.append(score)
+        overlap_scores[i] = score
 
         generated_responses, self_ppls = generate_func(model, tokenizer, context)
 
@@ -297,19 +304,41 @@ def eval_model(tests, model, tokenizer, generate_func=generate_fn, stream=None):
         corp_best_hyps.append(str_tokenize(best_response))
 
     _log('---------- Results ----------')
+    _log()
 
-    return calc_results(
-        sent_bleu_1s,
-        sent_bleu_2s,
-        sent_bleu_3s,
-        sent_bleu_4s,
-        sent_ibleu_1s,
-        sent_ibleu_2s,
-        sent_ibleu_3s,
-        sent_ibleu_4s,
-        corp_refs,
-        corp_model_hyps,
-    )
+    for threshold in thresholds:
+        _log('----- Threshold={} -----'.format(threshold))
+        _log()
+
+        drop_indices = np.where(overlap_scores > threshold)[0].tolist()
+
+        if len(drop_indices) == len(tests):
+            _log('Skipping threshold={}: no samples left after thresholding'.format(threshold))
+            _log()
+            continue
+        else:
+            _log('> {} samples remaining'.format(len(tests) - len(drop_indices)))
+            _log()
+
+        results = calc_results(
+            list_drop_indices(sent_bleu_1s, drop_indices),
+            list_drop_indices(sent_bleu_2s, drop_indices),
+            list_drop_indices(sent_bleu_3s, drop_indices),
+            list_drop_indices(sent_bleu_4s, drop_indices),
+            list_drop_indices(sent_ibleu_1s, drop_indices),
+            list_drop_indices(sent_ibleu_2s, drop_indices),
+            list_drop_indices(sent_ibleu_3s, drop_indices),
+            list_drop_indices(sent_ibleu_4s, drop_indices),
+            list_drop_indices(corp_inps, drop_indices),
+            list_drop_indices(corp_refs, drop_indices),
+            list_drop_indices(corp_model_hyps, drop_indices),
+            list_drop_indices(corp_best_hyps, drop_indices),
+            prefix_str='threshold_{}/'.format(threshold)
+        )
+        for k, v in results.items():
+            final_results[k] = v
+
+    return final_results
 
 if __name__ == '__main__':
 
@@ -336,4 +365,4 @@ if __name__ == '__main__':
     else:
         stream = open(args.ckpt + '.test', mode='w')
 
-    eval_model(test_dict, model, tokenizer, stream=stream)
+    print(eval_model(test_dict, model, tokenizer, stream=stream, thresholds=[0.25, 0.50, 0.75, 1.00]))
