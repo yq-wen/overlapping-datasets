@@ -111,7 +111,7 @@ def calculate_ngram_diversity(corpus):
 def eval_model(tests, model, tokenizer, generate_func=generate_fn, thresholds=[1.0], stream=None):
     '''
     Arguments:
-        test_dict (list): a list of namedtuples, each containing score (float),
+        tests (list): a list of namedtuples, each containing score (float),
             context (str), and a list of responses (str)
         generate_func (lambda): function that takes a post (str) as input
             and generates a list of responses (list<str>) and their confidences (float)
@@ -228,7 +228,7 @@ def eval_model(tests, model, tokenizer, generate_func=generate_fn, thresholds=[1
     corp_model_hyps = []  # List[List(str)], list of hypothesis (list of chars)
     corp_best_hyps = []  # List[List(str)], list of hypothesis (list of chars)
 
-    num_posts = len(test_dict)
+    num_posts = len(tests)
 
     overlap_scores = np.zeros(num_posts)
 
@@ -345,7 +345,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser('Script for evaluating models')
     parser.add_argument('--ckpt', type=str, default='')
     parser.add_argument('--output-file', type=str, default='')
-    parser.add_argument('--test-dict-path', type=str, default='preprocessing/dd/cleaned/clean_v4_2_sep_min_nsw/test_compare.csv')
+    parser.add_argument('--eval-path', type=str, default='preprocessing/dd/cleaned/clean_v4_2_sep_min_nsw/test_compare.csv')
     parser.add_argument('--max-num-dialogues', type=int, default=sys.maxsize)
 
     args = parser.parse_args()
@@ -355,8 +355,8 @@ if __name__ == '__main__':
 
     tokenizer = AutoTokenizer.from_pretrained("t5-base")
 
-    test_dict = build_dd_tests_from_csv(
-        path=args.test_dict_path,
+    tests = build_dd_tests_from_csv(
+        path=args.eval_path,
         max_num_dialogues=args.max_num_dialogues,
     )
 
@@ -365,4 +365,4 @@ if __name__ == '__main__':
     else:
         stream = open(args.ckpt + '.test', mode='w')
 
-    print(eval_model(test_dict, model, tokenizer, stream=stream, thresholds=[0.25, 0.50, 0.75, 1.00]))
+    print(eval_model(tests, model, tokenizer, stream=stream, thresholds=[0.25, 0.50, 0.75, 1.00]))
