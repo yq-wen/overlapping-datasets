@@ -32,6 +32,9 @@ BLEU_WEIGHTS_SINGLE = [
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
+def list_drop_indices(input_list, drop_indices):
+    return [item for idx, item in enumerate(input_list) if idx not in drop_indices]
+
 def str_tokenize(sent):
     '''Given a sentence (str), return a list of tokenized characters
     '''
@@ -105,10 +108,10 @@ def calculate_ngram_diversity(corpus):
 
     return uni_diversity, bi_diversity
 
-def eval_model(tests, model, tokenizer, generate_func=generate_fn, stream=None):
+def eval_model(tests, model, tokenizer, generate_func=generate_fn, thresholds=[1.0], stream=None):
     '''
     Arguments:
-        test_dict (list): a list of namedtuples, each containing score (float),
+        tests (list): a list of namedtuples, each containing score (float),
             context (str), and a list of responses (str)
         generate_func (lambda): function that takes a post (str) as input
             and generates a list of responses (list<str>) and their confidences (float)
@@ -121,6 +124,82 @@ def eval_model(tests, model, tokenizer, generate_func=generate_fn, stream=None):
             print(*args, file=stream)
         else:
             print(*args)
+
+    def calc_results(
+        sent_bleu_1s,
+        sent_bleu_2s,
+        sent_bleu_3s,
+        sent_bleu_4s,
+        sent_ibleu_1s,
+        sent_ibleu_2s,
+        sent_ibleu_3s,
+        sent_ibleu_4s,
+        corp_inps,
+        corp_refs,
+        corp_model_hyps,
+        corp_best_hyps,
+        prefix_str='',
+    ):
+
+        # print(i_corpus_bleu(corp_refs, corp_best_hyps, corp_inps))
+        _log('sent_bleus (1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
+            statistics.mean(sent_bleu_1s),
+            statistics.mean(sent_bleu_2s),
+            statistics.mean(sent_bleu_3s),
+            statistics.mean(sent_bleu_4s),
+        ))
+        _log('sent_ibleus (1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
+            statistics.mean(sent_ibleu_1s),
+            statistics.mean(sent_ibleu_2s),
+            statistics.mean(sent_ibleu_3s),
+            statistics.mean(sent_ibleu_4s),
+        ))
+        _log()
+
+        corp_model_bleu1 = corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[0])
+        corp_model_bleu2 = corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[1])
+        corp_model_bleu3 = corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[2])
+        corp_model_bleu4 = corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[3])
+        _log('corp_model_bleus(1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
+            corp_model_bleu1,
+            corp_model_bleu2,
+            corp_model_bleu3,
+            corp_model_bleu4,
+        ))
+
+        corp_model_ibleu1 = i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[0])
+        corp_model_ibleu2 = i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[1])
+        corp_model_ibleu3 = i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[2])
+        corp_model_ibleu4 = i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[3])
+        _log('corp_model_ibleus(1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
+            corp_model_ibleu1,
+            corp_model_ibleu2,
+            corp_model_ibleu3,
+            corp_model_ibleu4,
+        ))
+        _log()
+
+        tokens = [token for sentence in corp_model_hyps for token in sentence]
+        dist_1, dist_2 = calculate_ngram_diversity(tokens)
+        _log('dist_1: {:.5f}, dist_2: {:.5f}'.format(dist_1, dist_2))
+
+        _log()
+
+        # eval_ as prefix for huggingface logger to understand that this is eval...
+        return {
+            '{}corp_model_bleu1'.format(prefix_str): corp_model_bleu1,
+            '{}corp_model_bleu2'.format(prefix_str): corp_model_bleu2,
+            '{}corp_model_bleu3'.format(prefix_str): corp_model_bleu3,
+            '{}corp_model_bleu4'.format(prefix_str): corp_model_bleu4,
+            '{}corp_model_ibleu1'.format(prefix_str): corp_model_ibleu1,
+            '{}corp_model_ibleu2'.format(prefix_str): corp_model_ibleu2,
+            '{}corp_model_ibleu3'.format(prefix_str): corp_model_ibleu3,
+            '{}corp_model_ibleu4'.format(prefix_str): corp_model_ibleu4,
+            '{}dist_1'.format(prefix_str): dist_1,
+            '{}dist_2'.format(prefix_str): dist_2,
+        }
+
+    final_results = {}
 
     chosen_count = np.zeros(1)
 
@@ -140,11 +219,15 @@ def eval_model(tests, model, tokenizer, generate_func=generate_fn, stream=None):
     corp_model_hyps = []  # List[List(str)], list of hypothesis (list of chars)
     corp_best_hyps = []  # List[List(str)], list of hypothesis (list of chars)
 
-    num_posts = len(test_dict)
+    num_posts = len(tests)
+
+    overlap_scores = np.zeros(num_posts)
 
     for i in range(num_posts):
 
         score, context, reference_responses = tests[i]
+
+        overlap_scores[i] = score
 
         generated_responses, self_ppls = generate_func(model, tokenizer, context)
 
@@ -212,80 +295,48 @@ def eval_model(tests, model, tokenizer, generate_func=generate_fn, stream=None):
         corp_best_hyps.append(str_tokenize(best_response))
 
     _log('---------- Results ----------')
-
-    # print(i_corpus_bleu(corp_refs, corp_best_hyps, corp_inps))
-    _log('sent_bleus (1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
-        statistics.mean(sent_bleu_1s),
-        statistics.mean(sent_bleu_2s),
-        statistics.mean(sent_bleu_3s),
-        statistics.mean(sent_bleu_4s),
-    ))
-    _log('sent_ibleus (1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
-        statistics.mean(sent_ibleu_1s),
-        statistics.mean(sent_ibleu_2s),
-        statistics.mean(sent_ibleu_3s),
-        statistics.mean(sent_ibleu_4s),
-    ))
     _log()
 
-    corp_model_bleu1 = corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[0])
-    corp_model_bleu = corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[3])
-    _log('corp_model_bleus(1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
-        corp_model_bleu1,
-        corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[1]),
-        corpus_bleu(corp_refs, corp_model_hyps, weights=BLEU_WEIGHTS_MEAN[2]),
-        corp_model_bleu,
-    ))
+    for threshold in thresholds:
+        _log('----- Threshold={} -----'.format(threshold))
+        _log()
 
-    corp_model_ibleu1 = i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[0])
-    corp_model_ibleu = i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[3])
-    _log('corp_model_ibleus(1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
-        corp_model_ibleu1,
-        i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[1]),
-        i_corpus_bleu(corp_refs, corp_model_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[2]),
-        corp_model_ibleu,
-    ))
-    _log()
+        drop_indices = np.where(overlap_scores > threshold)[0].tolist()
 
-    corp_best_bleu = corpus_bleu(corp_refs, corp_best_hyps, weights=BLEU_WEIGHTS_MEAN[3])
-    _log('corp_best_bleus(1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
-        corpus_bleu(corp_refs, corp_best_hyps, weights=BLEU_WEIGHTS_MEAN[0]),
-        corpus_bleu(corp_refs, corp_best_hyps, weights=BLEU_WEIGHTS_MEAN[1]),
-        corpus_bleu(corp_refs, corp_best_hyps, weights=BLEU_WEIGHTS_MEAN[2]),
-        corp_best_bleu,
-    ))
-    corp_best_ibleu = i_corpus_bleu(corp_refs, corp_best_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[3])
-    _log('corp_best_ibleus(1-4): {:.5f}, {:.5f}, {:.5f}, {:.5f}'.format(
-        i_corpus_bleu(corp_refs, corp_best_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[0]),
-        i_corpus_bleu(corp_refs, corp_best_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[1]),
-        i_corpus_bleu(corp_refs, corp_best_hyps, corp_inps, weights=BLEU_WEIGHTS_MEAN[2]),
-        corp_best_ibleu,
-    ))
+        if len(drop_indices) == len(tests):
+            _log('Skipping threshold={}: no samples left after thresholding'.format(threshold))
+            _log()
+            continue
+        else:
+            _log('> {} samples remaining'.format(len(tests) - len(drop_indices)))
+            _log()
 
-    tokens = [token for sentence in corp_model_hyps for token in sentence]
-    dist_1, dist_2 = calculate_ngram_diversity(tokens)
-    _log('dist_1: {:.5f}, dist_2: {:.5f}'.format(dist_1, dist_2))
+        results = calc_results(
+            list_drop_indices(sent_bleu_1s, drop_indices),
+            list_drop_indices(sent_bleu_2s, drop_indices),
+            list_drop_indices(sent_bleu_3s, drop_indices),
+            list_drop_indices(sent_bleu_4s, drop_indices),
+            list_drop_indices(sent_ibleu_1s, drop_indices),
+            list_drop_indices(sent_ibleu_2s, drop_indices),
+            list_drop_indices(sent_ibleu_3s, drop_indices),
+            list_drop_indices(sent_ibleu_4s, drop_indices),
+            list_drop_indices(corp_inps, drop_indices),
+            list_drop_indices(corp_refs, drop_indices),
+            list_drop_indices(corp_model_hyps, drop_indices),
+            list_drop_indices(corp_best_hyps, drop_indices),
+            prefix_str='threshold_{:.2f}/'.format(threshold)
+        )
+        for k, v in results.items():
+            final_results[k] = v
 
-    _log()
-
-    # eval_ as prefix for huggingface logger to understand that this is eval...
-    return {
-        'corp_model_bleu1': corp_model_bleu1,
-        'corp_model_bleu': corp_model_bleu,
-        'corp_model_ibleu1': corp_model_ibleu1,
-        'corp_model_ibleu': corp_model_ibleu,
-        'corp_best_bleu': corp_best_bleu,
-        'corp_best_ibleu': corp_best_ibleu,
-        'dist_1': dist_1,
-        'dist_2': dist_2,
-    }
+    return final_results
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser('Script for evaluating models')
     parser.add_argument('--ckpt', type=str, default='')
     parser.add_argument('--output-file', type=str, default='')
-    parser.add_argument('--test-dict-path', type=str, default='preprocessing/dd/cleaned/clean_v4_2_sep_min_nsw/test_compare.csv')
+    parser.add_argument('--eval-path', type=str, default='preprocessing/dd/cleaned/clean_v4_2_sep_min_nsw/test_compare.csv')
     parser.add_argument('--max-num-dialogues', type=int, default=sys.maxsize)
 
     args = parser.parse_args()
@@ -295,8 +346,8 @@ if __name__ == '__main__':
 
     tokenizer = AutoTokenizer.from_pretrained("t5-base")
 
-    test_dict = build_dd_tests_from_csv(
-        path=args.test_dict_path,
+    tests = build_dd_tests_from_csv(
+        path=args.eval_path,
         max_num_dialogues=args.max_num_dialogues,
     )
 
@@ -305,4 +356,4 @@ if __name__ == '__main__':
     else:
         stream = open(args.ckpt + '.test', mode='w')
 
-    eval_model(test_dict, model, tokenizer, stream=stream)
+    print(eval_model(tests, model, tokenizer, stream=stream, thresholds=[0.25, 0.50, 0.75, 1.00]))

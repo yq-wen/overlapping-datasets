@@ -12,7 +12,7 @@ from torch.utils.data import Dataset, DataLoader
 from dailydialogue import DailyDialogueDataset
 from dateutil import tz
 from eval import eval_model
-from util import build_dd_test_dict_from_csv
+from util import build_dd_tests_from_csv
 
 
 class Logger():
@@ -195,9 +195,10 @@ class BaseTrainer():
 
 class T5Trainer(BaseTrainer):
 
-    def __init__(self, *args, eval_every=1, **kwargs):
+    def __init__(self, *args, eval_every=1, eval_tests=None, **kwargs):
 
         self.eval_every = eval_every
+        self.eval_tests = eval_tests
 
         self.best_metrics = {}  # map from metric (str) to the best value (float)
         self.best_path    = {}  # map from metric (str) to the path of ckpt (str)
@@ -215,10 +216,24 @@ class T5Trainer(BaseTrainer):
 
     def epoch_end(self):
 
+        def _is_save_metric(metric_str):
+            if 'corp_model_bleu1' in metric_str:
+                return True
+            if 'corp_model_ibleu1' in metric_str:
+                return True
+            if 'corp_model_bleu4' in metric_str:
+                return True
+            if 'corp_model_ibleu4' in metric_str:
+                return True
+            if 'dist_2' in metric_str:
+                return True
+            return False
+
         if self.epoch % self.eval_every == 0:
 
             with open(pathlib.PosixPath(self.log_dir, '_epoch_{}.pt.eval'.format(self.epoch)), mode='w') as f:
-                results = eval_model(TEST_DICT, self.model, tokenizer, stream=f)
+
+                results = eval_model(self.eval_tests, self.model, tokenizer, stream=f, thresholds=[0.25, 0.50, 0.75, 1.00])
 
             for k, v in results.items():
                 print('{}: {}'.format(k, v))
@@ -229,21 +244,25 @@ class T5Trainer(BaseTrainer):
 
                 save = False
 
-                # initialization
-                if k not in self.best_metrics or k not in self.best_path:
-                    save = True
-                else:
-                    save = v > self.best_metrics[k]
-                    # remove previous ckpt
-                    if save:
-                        self.best_path[k].unlink()
+                if _is_save_metric(k):
 
-                if save:
-                    self.best_metrics[k] = v
-                    save_name = 'best_{}_epoch_{}.pt'.format(k, self.epoch)
-                    save_path = pathlib.PosixPath(self.log_dir, save_name)
-                    torch.save(self.model, save_path)
-                    self.best_path[k] = save_path
+                    # initialization
+                    if k not in self.best_metrics or k not in self.best_path:
+                        save = True
+                    else:
+                        save = v > self.best_metrics[k]
+                        # remove previous ckpt
+                        if save:
+                            self.best_path[k].unlink()
+
+                    if save:
+                        self.best_metrics[k] = v
+                        save_name = 'best_{}_epoch_{}.pt'.format(k, self.epoch)
+                        # / for organizing tensorboard, but can't use / for save path
+                        save_name = save_name.replace('/', '_')
+                        save_path = pathlib.PosixPath(self.log_dir, save_name)
+                        torch.save(self.model, save_path)
+                        self.best_path[k] = save_path
 
 if __name__ == '__main__':
 
@@ -254,17 +273,21 @@ if __name__ == '__main__':
     parser.add_argument('--batch-size', type=int, default=64)
     parser.add_argument('--learning-rate', type=float, default=5e-5)
     parser.add_argument('--num-training-examples', type=int, default=None)
+
     parser.add_argument('--save-every', type=int, default=1)
     parser.add_argument('--eval-every', type=int, default=1)
+
+    parser.add_argument('--eval-path', type=str, default='preprocessing/dd/cleaned/clean_v4_2_sep_min_nsw/test_compare.csv')
+    parser.add_argument('--eval-max', type=int, default=None)
 
     args = parser.parse_args()
 
     tokenizer = AutoTokenizer.from_pretrained("t5-base")
     model = AutoModelWithLMHead.from_pretrained("t5-base")
 
-    TEST_DICT = build_dd_test_dict_from_csv(
-        path='data/hareesh/df_daily_valid_without_duplicates.csv',
-        max_num_dialogues=1000
+    eval_tests = build_dd_tests_from_csv(
+        path=args.eval_path,
+        max_num_dialogues=args.eval_max,
     )
 
     dataset = DailyDialogueDataset(tokenizer)
@@ -286,6 +309,7 @@ if __name__ == '__main__':
         log_root_dir=None,
         save_every=args.save_every,
         eval_every=args.eval_every,
+        eval_tests=eval_tests,
     )
 
     trainer.train()
