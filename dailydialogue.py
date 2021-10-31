@@ -72,7 +72,7 @@ class RawDailyDialogueDataset(Dataset):
 
 class DailyDialogueDataset(Dataset):
 
-    def __init__(self, tokenizer, max_length=20, path='data/hareesh/df_daily_train.csv'):
+    def __init__(self, tokenizer, max_length=20, path='preprocessing/dd/cleaned/clean_v7_2gram/train.csv'):
 
         df = pd.read_csv(path)
 
@@ -80,8 +80,8 @@ class DailyDialogueDataset(Dataset):
         responses = []
 
         for index, row in df.iterrows():
-            contexts.append(row['line'])
-            responses.append(row['reply'])
+            contexts.append(row['context'])
+            responses.append(row['response'])
 
         inputs = tokenizer(
             contexts,

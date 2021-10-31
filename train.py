@@ -233,7 +233,7 @@ class T5Trainer(BaseTrainer):
 
             with open(pathlib.PosixPath(self.log_dir, '_epoch_{}.pt.eval'.format(self.epoch)), mode='w') as f:
 
-                results = eval_model(self.eval_tests, self.model, tokenizer, stream=f, thresholds=[0.25, 0.50, 0.75, 1.00])
+                results = eval_model(self.eval_tests, self.model, tokenizer, stream=f, thresholds=[0.40, 0.60, 0.80, 1.00])
 
             for k, v in results.items():
                 print('{}: {}'.format(k, v))

@@ -91,6 +91,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     train_df = flatten('../../data/ijcnlp_dailydialog/train/dialogues_train.txt')
+    train_df.to_csv('train.csv', index=False)
+
     test_df = flatten('../..//data/ijcnlp_dailydialog/test/dialogues_test.txt')
     valid_df = flatten('../../data/ijcnlp_dailydialog/validation/dialogues_validation.txt')
 
