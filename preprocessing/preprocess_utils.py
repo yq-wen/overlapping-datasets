@@ -1,16 +1,26 @@
 import string
 import numpy as np
 import math
+import time
 import pandas as pd
 import matplotlib.pyplot as plt
+import scipy
+import nltk
 
 from nltk.corpus import stopwords
 from nltk import wordpunct_tokenize
-import nltk
-nltk.download('stopwords')
+
 
 stopword_set = set(stopwords.words('english'))
 
+
+def profile(f):
+    def wrap(*args, **kwargs):
+        start = time.time()
+        ret = f(*args, **kwargs)
+        print('Function {} took: {:.2f} seconds'.format(f.__name__, time.time() - start))
+        return ret
+    return wrap
 
 def preprocess_str(line):
     '''Proprocessing for the sake of generating a fair bow features.
@@ -24,6 +34,14 @@ def preprocess_str(line):
         processed_tokens.append(token)
     return ' '.join(processed_tokens)
 
+def get_grams(line, n=1):
+    '''Given a line (str), return a generator that generates grams (tuple)
+    '''
+    line = preprocess_str(line)
+    tokens = wordpunct_tokenize(line)
+    return nltk.ngrams(tokens, n=n)
+
+@profile
 def compute_score_matrix(bow_1, bow_2):
     '''
     Arguments:
@@ -50,7 +68,7 @@ def compute_score_matrix(bow_1, bow_2):
 
     # nans happen where both sentences contain only punctuations
     # therefore, consider them to be an exact overlap
-    np.nan_to_num(score_matrix, copy=False, nan=1.0)
+    np.nan_to_num(score_matrix, copy=False, nan=0.0)
 
     return score_matrix
 
@@ -168,16 +186,16 @@ def compute_scores_sep(train_context_bow, train_response_bow, eval_context_bow, 
             generated the maximum overlap. (shape: (num_eval_samples,))
     '''
     context_score_matrix = compute_score_matrix(train_context_bow, eval_context_bow)
-    response_score_matrix = compute_score_matrix(train_response_bow, eval_response_bow)
+    # response_score_matrix = compute_score_matrix(train_response_bow, eval_response_bow)
 
     # score_matrix  = (context_score_matrix + response_score_matrix) / 2
-    score_matrix  = np.minimum(context_score_matrix, response_score_matrix)
+    # score_matrix  = np.minimum(context_score_matrix, response_score_matrix)
+    score_matrix = context_score_matrix
 
     max_overlap_indices = score_matrix.argmax(axis=0)
     scores = score_matrix[max_overlap_indices, range(score_matrix.shape[1])]
 
     return scores, max_overlap_indices
-
 
 def dump_results(train_df, eval_df, scores, max_overlap_indices, output_name):
 
@@ -222,7 +240,6 @@ def dump_results(train_df, eval_df, scores, max_overlap_indices, output_name):
     compare_df.to_csv('{}_compare.csv'.format(output_name))
 
     return
-
 
 def clean_and_dump(train_df, train_bow, eval_df, eval_bow, output_name):
     '''
