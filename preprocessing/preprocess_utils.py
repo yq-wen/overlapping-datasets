@@ -6,10 +6,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import scipy
 import nltk
+import torch
 
 from nltk.corpus import stopwords
 from nltk import wordpunct_tokenize
 
+from design_matrix import DesignMatrix
+from torch.utils.data import Dataset, DataLoader
 
 stopword_set = set(stopwords.words('english'))
 
@@ -59,8 +62,8 @@ def compute_score_matrix(bow_1, bow_2):
     bow_2_len = bow_2.sum(axis=1)  # (num_bow_2_samples,)
 
     # len_matrics all have shape: (num_bow_1_samples, num_bow_2_samples)
-    bow_1_len_matrix = np.broadcast_to(bow_1_len, (num_2_bow_samples, num_1_bow_samples)).T
-    bow_2_len_matrix = np.broadcast_to(bow_2_len, (num_1_bow_samples, num_2_bow_samples))
+    bow_1_len_matrix = torch.broadcast_to(bow_1_len, (num_2_bow_samples, num_1_bow_samples)).T
+    bow_2_len_matrix = torch.broadcast_to(bow_2_len, (num_1_bow_samples, num_2_bow_samples))
     total_len_matrix = bow_1_len_matrix + bow_2_len_matrix
 
     overlap_matrix = bow_1 @ bow_2.T  # (num_bow_1_samples, num_bow_2_samples)
@@ -68,7 +71,7 @@ def compute_score_matrix(bow_1, bow_2):
 
     # nans happen where both sentences contain only punctuations
     # therefore, consider them to be an exact overlap
-    np.nan_to_num(score_matrix, copy=False, nan=0.0)
+    score_matrix = torch.nan_to_num(score_matrix, nan=0.0)
 
     return score_matrix
 
@@ -175,6 +178,7 @@ def compute_bz_scores_sep(train_context_bow, train_response_bow, eval_context_bo
 
     return final_scores, final_overlap_indices
 
+@profile
 def compute_scores_sep(train_context_bow, train_response_bow, eval_context_bow, eval_response_bow):
     '''Computes the score for context and response seperately
     Arguments:
@@ -197,7 +201,53 @@ def compute_scores_sep(train_context_bow, train_response_bow, eval_context_bow, 
 
     return scores, max_overlap_indices
 
+@profile
+def batch_compute_scores_sep(
+        design_matrix, batch_size,
+        eval_context_bow, eval_response_bow,
+        verbose=False,
+    ):
+
+    loader = DataLoader(design_matrix, batch_size=batch_size, pin_memory=True)
+
+    for batch_idx, batch in enumerate(loader):
+
+        if verbose:
+            print('batch: {}/{}'.format(batch_idx, len(loader)))
+
+        batch_train_context_bow = batch.cuda()
+        batch_train_response_bow = None
+
+        num_eval_samples = eval_context_bow.shape[0]
+
+        local_scores, local_max_overlap_indices = compute_scores_sep(
+            batch_train_context_bow, batch_train_response_bow,
+            eval_context_bow, eval_response_bow
+        )
+        local_max_overlap_indices += batch_idx * batch_size
+
+        if batch_idx == 0:
+            final_scores = local_scores
+            final_max_overlap_indices = local_max_overlap_indices
+        else:
+
+            # After stacking, both has shape: (2, num_eval_samples)
+            stacked_scores = torch.stack((local_scores, final_scores), 0)
+            stacked_max_overlap_indices = torch.stack(
+                (local_max_overlap_indices, final_max_overlap_indices), 0
+            )
+
+            # Select the better of the two
+            args = stacked_scores.argmax(dim=0)
+            final_scores = stacked_scores[args, range(num_eval_samples)]
+            final_max_overlap_indices = stacked_max_overlap_indices[args, range(num_eval_samples)]
+
+    return final_scores, final_max_overlap_indices
+
 def dump_results(train_df, eval_df, scores, max_overlap_indices, output_name):
+
+    scores = scores.cpu().numpy()
+    max_overlap_indices = max_overlap_indices.cpu().numpy()
 
     # ----- Plots -----
     bin_width = 0.05
