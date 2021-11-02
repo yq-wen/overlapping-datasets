@@ -8,6 +8,7 @@ import pandas as pd
 import numpy
 import scipy
 import nltk
+import torch
 
 import preprocess_utils
 import matplotlib.pyplot as plt
@@ -16,6 +17,8 @@ from tqdm import tqdm
 from nltk import wordpunct_tokenize
 from nltk.corpus import stopwords
 from collections import Counter
+from design_matrix import DesignMatrix
+from torch.utils.data import Dataset, DataLoader
 
 
 def flatten(path, num_contexts=1):
@@ -48,7 +51,7 @@ def df2bow(df, w2i, n=1):
     num_examples = df.shape[0]
     vocab_size = len(w2i)
 
-    bow = numpy.zeros((num_examples, vocab_size))
+    bow = torch.zeros((num_examples, vocab_size), dtype=torch.float16)
 
     for idx, row in tqdm(df.iterrows(), total=df.shape[0]):
         line = row['context']
@@ -56,15 +59,15 @@ def df2bow(df, w2i, n=1):
         for gram in grams:
             bow[idx, w2i[gram]] = 1
 
-    return bow
+    return bow.cuda()
 
 def df2bows(df, w2i, n=1):
 
     num_examples = df.shape[0]
     vocab_size = len(w2i)
 
-    context_bow = numpy.zeros((num_examples, vocab_size))
-    response_bow = numpy.zeros((num_examples, vocab_size))
+    context_bow = torch.zeros((num_examples, vocab_size))
+    response_bow = torch.zeros((num_examples, vocab_size))
 
     for idx, row in tqdm(df.iterrows(), total=df.shape[0]):
 
@@ -115,21 +118,26 @@ if __name__ == '__main__':
         w2i[w] = idx
         idx += 1
 
-    train_context_bow = df2bow(train_df, w2i, n=args.n)
-    valid_context_bow = df2bow(valid_df, w2i, n=args.n)
-    test_context_bow  = df2bow(test_df, w2i, n=args.n)
-
     print('vocab_size:', len(w2i))
 
-    valid_scores, valid_max_overlap_indices = preprocess_utils.compute_scores_sep(
-        train_context_bow, None,
-        valid_context_bow, None,
-    )
+    design_matrix = DesignMatrix(w2i, train_df, n=args.n)
 
-    test_scores, test_max_overlap_indices = preprocess_utils.compute_scores_sep(
-        train_context_bow, None,
+    # test
+    test_context_bow  = df2bow(test_df, w2i, n=args.n)
+    test_scores, test_max_overlap_indices = preprocess_utils.batch_compute_scores_sep(
+        design_matrix, 1024,
         test_context_bow, None,
+        verbose=True,
     )
-
-    preprocess_utils.dump_results(train_df, valid_df, valid_scores, valid_max_overlap_indices, 'valid')
     preprocess_utils.dump_results(train_df, test_df, test_scores, test_max_overlap_indices, 'test')
+    del test_context_bow
+
+    # valid
+    valid_context_bow = df2bow(valid_df, w2i, n=args.n)
+    valid_scores, valid_max_overlap_indices = preprocess_utils.batch_compute_scores_sep(
+        design_matrix, 1024,
+        valid_context_bow, None,
+        verbose=True,
+    )
+    preprocess_utils.dump_results(train_df, valid_df, valid_scores, valid_max_overlap_indices, 'valid')
+    del valid_context_bow
