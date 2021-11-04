@@ -280,11 +280,22 @@ if __name__ == '__main__':
     parser.add_argument('--eval-path', type=str, default='preprocessing/dd/cleaned/clean_v4_2_sep_min_nsw/test_compare.csv')
     parser.add_argument('--eval-max', type=int, default=None)
     parser.add_argument('--sanity', action='store_true')
+    parser.add_argument('--log-root-dir', type=str, default=BaseTrainer.LOG_ROOT_DIR)
+    parser.add_argument('--log-every', type=int, default=100)
+    parser.add_argument('--no-save', action='store_true')
+
+    # Model parameters
+    parser.add_argument('--model-str', type=str, default='t5-base')
+
+    # Training parameters
+    parser.add_argument('--num-epochs', type=int, default=10000)
+    parser.add_argument('--learning-rate', type=float, default=5e-5)
+    parser.add_argument('--batch-size', type=int, default=64)
 
     args = parser.parse_args()
 
-    tokenizer = AutoTokenizer.from_pretrained("t5-base")
-    model = AutoModelWithLMHead.from_pretrained("t5-base")
+    tokenizer = AutoTokenizer.from_pretrained(args.model_str)
+    model = AutoModelWithLMHead.from_pretrained(args.model_str)
 
     eval_tests = build_dd_tests_from_csv(
         path=args.eval_path,
@@ -302,12 +313,12 @@ if __name__ == '__main__':
     trainer = T5Trainer(
         model=model,
         train_dataset=train_dataset,
-        num_epochs=1000,
-        learning_rate=5e-5,
-        log_every=100,
-        batch_size=64,
-        save_models=True,
-        log_root_dir=None,
+        num_epochs=args.num_epochs,
+        learning_rate=args.learning_rate,
+        log_every=args.log_every,
+        batch_size=args.batch_size,
+        save_models=not args.no_save,
+        log_root_dir=args.log_root_dir,
         save_every=args.save_every,
         eval_every=args.eval_every,
         eval_tests=eval_tests,
