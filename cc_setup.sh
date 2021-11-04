@@ -7,7 +7,7 @@ pip install --no-index transformers
 python download.py --model="t5-base"
 python download.py --model="t5-small"
 
-python -m nltk.downloader all
+python -m nltk.downloader popular
 
 deactivate
 rm -rf $ENVDIR
