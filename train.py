@@ -279,6 +279,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--eval-path', type=str, default='preprocessing/dd/cleaned/clean_v4_2_sep_min_nsw/test_compare.csv')
     parser.add_argument('--eval-max', type=int, default=None)
+    parser.add_argument('--sanity', action='store_true')
 
     args = parser.parse_args()
 
@@ -310,6 +311,7 @@ if __name__ == '__main__':
         save_every=args.save_every,
         eval_every=args.eval_every,
         eval_tests=eval_tests,
+        sanity=args.sanity,
     )
 
     trainer.train()
