@@ -72,7 +72,7 @@ class RawDailyDialogueDataset(Dataset):
 
 class DailyDialogueDataset(Dataset):
 
-    def __init__(self, tokenizer, max_length=20, path='preprocessing/dd/cleaned/clean_v7_2gram/train.csv'):
+    def __init__(self, tokenizer, max_length=20, path=None):
 
         df = pd.read_csv(path)
 

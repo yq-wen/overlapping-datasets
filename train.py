@@ -270,14 +270,14 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser('Training script for T5')
 
-    parser.add_argument('--batch-size', type=int, default=64)
-    parser.add_argument('--learning-rate', type=float, default=5e-5)
     parser.add_argument('--num-training-examples', type=int, default=None)
 
     parser.add_argument('--save-every', type=int, default=1)
     parser.add_argument('--eval-every', type=int, default=1)
 
-    parser.add_argument('--eval-path', type=str, default='preprocessing/dd/cleaned/clean_v4_2_sep_min_nsw/test_compare.csv')
+    parser.add_argument('--train-path', type=str, default='data/wen/clean_v9_1gram_bz=8192/train.csv')
+    parser.add_argument('--eval-path', type=str, default='data/wen/clean_v9_1gram_bz=8192/test_compare.csv')
+
     parser.add_argument('--eval-max', type=int, default=None)
     parser.add_argument('--sanity', action='store_true')
     parser.add_argument('--log-root-dir', type=str, default=BaseTrainer.LOG_ROOT_DIR)
@@ -302,7 +302,10 @@ if __name__ == '__main__':
         max_num_dialogues=args.eval_max,
     )
 
-    dataset = DailyDialogueDataset(tokenizer)
+    dataset = DailyDialogueDataset(
+        tokenizer,
+        path=args.train_path,
+    )
 
     if args.num_training_examples:
         indices = np.random.choice(len(dataset), size=args.num_training_examples, replace=False)
