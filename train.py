@@ -233,7 +233,7 @@ class T5Trainer(BaseTrainer):
 
             with open(pathlib.PosixPath(self.log_dir, '_epoch_{}.pt.eval'.format(self.epoch)), mode='w') as f:
 
-                results = eval_model(self.eval_tests, self.model, tokenizer, stream=f, thresholds=[0.40, 0.60, 0.80, 1.00])
+                results = eval_model(self.eval_tests, self.model, tokenizer, stream=f, thresholds=[0.50, 0.60, 0.70, 0.75, 0.80, 0.90, 1.00])
 
             for k, v in results.items():
                 print('{}: {}'.format(k, v))
@@ -275,8 +275,8 @@ if __name__ == '__main__':
     parser.add_argument('--save-every', type=int, default=1)
     parser.add_argument('--eval-every', type=int, default=1)
 
-    parser.add_argument('--train-path', type=str, default='data/wen/clean_v9_1gram_bz=8192/train.csv')
-    parser.add_argument('--eval-path', type=str, default='data/wen/clean_v9_1gram_bz=8192/test_compare.csv')
+    parser.add_argument('--train-path', type=str, default='data/dedup/train.csv')
+    parser.add_argument('--eval-path', type=str, default='data/dedup/test.csv')
 
     parser.add_argument('--eval-max', type=int, default=None)
     parser.add_argument('--sanity', action='store_true')

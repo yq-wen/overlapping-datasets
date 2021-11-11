@@ -287,7 +287,7 @@ def dump_results(train_df, eval_df, scores, max_overlap_indices, output_name):
         'eval_response': eval_df['response'].reset_index(drop=True),
     })
     compare_df.sort_values('score', inplace=True)
-    compare_df.to_csv('{}_compare.csv'.format(output_name))
+    compare_df.to_csv('{}.csv'.format(output_name))
 
     return
 

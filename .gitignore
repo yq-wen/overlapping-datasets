@@ -133,4 +133,5 @@ data/*
 !data/hareesh
 !data/ijcnlp_dailydialog
 !data/wen
+!data/dedup
 log/
