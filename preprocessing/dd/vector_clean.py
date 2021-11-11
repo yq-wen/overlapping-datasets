@@ -46,6 +46,24 @@ def flatten(path, num_contexts=1):
 
     return pd.DataFrame(dialogs, columns=['context', 'response'])
 
+def df2w2i(df, n=1):
+    # Build the counter
+    counter = Counter()
+    for idx, row in tqdm(df.iterrows(), total=df.shape[0]):
+        line = row['context']
+        grams = preprocess_utils.get_grams(line, n=n)
+        for gram in grams:
+            counter[gram] += 1
+    vocab_size = len(counter)
+
+    # Build w2i
+    w2i = dict()
+    idx = 0
+    for w in counter:
+        w2i[w] = idx
+        idx += 1
+    return w2i
+
 def df2bow(df, w2i, n=1):
 
     num_examples = df.shape[0]
