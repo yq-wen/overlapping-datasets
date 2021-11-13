@@ -46,7 +46,6 @@ class BaseTrainer():
         save_models=True,
         log_root_dir=None,
         sanity=False,
-        eval=False,
         save_every=1,
     ):
 
@@ -65,7 +64,6 @@ class BaseTrainer():
         self.log_every = log_every
         self.save_models = save_models
         self.sanity = sanity
-        self.eval = eval
         self.batch_size = batch_size
         self.save_every = save_every
 
@@ -105,8 +103,6 @@ class BaseTrainer():
 
         # Set up dataloaders for the datasets
         self.train_loader = DataLoader(self.train_dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
-        if self.eval:
-            self.eval_loader = DataLoader(self.eval_dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
         self.num_train_batches = len(self.train_loader)
 
     def compute_loss(self, batch):
@@ -172,26 +168,13 @@ class BaseTrainer():
 
                 self.train_step_end()
 
-            # Evaluation steps
-            if self.eval:
-                self.model.eval()
-                with torch.no_grad():
-                    val_losses = []
-                    for batch_idx, batch in enumerate(self.eval_loader):
-                        loss = self.compute_loss(batch)
-                        val_losses.append(loss.item())
-                    val_loss = statistics.mean(val_losses)
-                    self.writer.add_scalar('val/loss', val_loss, self.global_step)
-
             # End of Epoch
+            self.model.eval()
             with torch.no_grad():
                 self.save()
                 self.epoch_end()
 
-            if self.eval:
-                print('end of epoch {} | val loss: {:.3f}'.format(epoch, val_loss))
-            else:
-                print('end of epoch {}'.format(epoch))
+            print('end of epoch {}'.format(epoch))
 
 class T5Trainer(BaseTrainer):
 

@@ -119,6 +119,8 @@ def eval_model(tests, model, tokenizer, generate_func=generate_fn, thresholds=[1
         dict: metric (str) -> value (float)
     '''
 
+    assert not model.training
+
     def _log(*args):
         if stream:
             print(*args, file=stream)
