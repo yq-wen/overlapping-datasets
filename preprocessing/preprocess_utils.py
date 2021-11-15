@@ -244,12 +244,8 @@ def batch_compute_scores_sep(
 
     return final_scores, final_max_overlap_indices
 
-def dump_results(train_df, eval_df, scores, max_overlap_indices, output_name):
+def draw_scores(scores, prefix=''):
 
-    scores = scores.cpu().numpy()
-    max_overlap_indices = max_overlap_indices.cpu().numpy()
-
-    # ----- Plots -----
     bin_width = 0.05
     bins = np.arange(0.0, 1.0 + bin_width, bin_width)
 
@@ -258,7 +254,7 @@ def dump_results(train_df, eval_df, scores, max_overlap_indices, output_name):
     plt.xlabel('Overlap Ratio', fontsize=20)
     plt.ylabel('# of Samples', fontsize=20)
     plt.tick_params(axis='both', which='major', labelsize=20)
-    plt.savefig('{}_scores.png'.format(output_name), bbox_inches='tight')
+    plt.savefig('{}_scores.png'.format(prefix), bbox_inches='tight')
     plt.close()
 
     # Plot a cumulative graph of scores
@@ -266,8 +262,17 @@ def dump_results(train_df, eval_df, scores, max_overlap_indices, output_name):
     plt.xlabel('Overlap Ratio', fontsize=20)
     plt.ylabel('% Data', fontsize=20)
     plt.tick_params(axis='both', which='major', labelsize=20)
-    plt.savefig('{}_cumulative_scores.png'.format(output_name), bbox_inches='tight')
+    plt.savefig('{}_cumulative_scores.png'.format(prefix), bbox_inches='tight')
     plt.close()
+
+    return None
+
+def dump_results(train_df, eval_df, scores, max_overlap_indices, output_name):
+
+    scores = scores.cpu().numpy()
+    max_overlap_indices = max_overlap_indices.cpu().numpy()
+
+    draw_scores(scores, prefix=output_name)
 
     for threshold in [0.00, 0.25, 0.50, 0.60, 0.75, 1.00]:
         drop_indices = (scores > threshold).nonzero()[0]
