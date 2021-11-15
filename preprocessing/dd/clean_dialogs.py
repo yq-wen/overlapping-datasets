@@ -67,66 +67,69 @@ def build_bow(dialogs, w2i):
             bow[idx, w2i[gram]] = 1
     return bow
 
-    # compare_df = pd.DataFrame({
-    #     'score': scores,
-    #     'train_context': train_df['context'][max_overlap_indices].reset_index(drop=True),
-    #     'train_response': train_df['response'][max_overlap_indices].reset_index(drop=True),
-    #     'eval_context': eval_df['context'].reset_index(drop=True),
-    #     'eval_response': eval_df['response'].reset_index(drop=True),
-    # })
-
 TRAIN_PATH = '../../data/ijcnlp_dailydialog/train/dialogues_train.txt'
 VALID_PATH = '../../data/ijcnlp_dailydialog/validation/dialogues_validation.txt'
 TEST_PATH = '../../data/ijcnlp_dailydialog/test/dialogues_test.txt'
 
 if __name__ == '__main__':
 
-    train_dialogs = get_dialogs(TRAIN_PATH)
-    valid_dialogs = get_dialogs(VALID_PATH)
-    test_dialogs = get_dialogs(TEST_PATH)
+    parser = argparse.ArgumentParser('Script for deduplicating and splitting dialogues')
+    parser.add_argument('--mode', choices=['dedup', 'split'], default='split')
 
-    dialogs = list(itertools.chain(train_dialogs, valid_dialogs, test_dialogs))
+    args = parser.parse_args()
 
-    w2i = build_w2i(dialogs)
+    if args.mode == 'dedup':
 
-    train_bow = build_bow(train_dialogs, w2i)
-    valid_bow = build_bow(valid_dialogs, w2i)
-    test_bow = build_bow(test_dialogs, w2i)
+        train_dialogs = get_dialogs(TRAIN_PATH)
+        valid_dialogs = get_dialogs(VALID_PATH)
+        test_dialogs = get_dialogs(TEST_PATH)
 
-    # Test
-    scores, max_overlap_indices = preprocess_utils.compute_scores_sep(
-        train_bow, None,
-        test_bow, None
-    )
-    scores = scores.cpu().numpy()
-    max_overlap_indices = max_overlap_indices.cpu().numpy()
-    preprocess_utils.draw_scores(scores, prefix='test')
-    compare_df = pd.DataFrame({
-        'score': scores,
-        'train_dialogs': [dialogs[i] for i in max_overlap_indices],
-        'eval_dialogs' : test_dialogs,
-    })
-    compare_df.sort_values('score', inplace=True)
-    compare_df.to_csv('{}.csv'.format('test'))
+        dialogs = list(itertools.chain(train_dialogs, valid_dialogs, test_dialogs))
 
-    del test_bow
+        w2i = build_w2i(dialogs)
 
-    # Valid
-    scores, max_overlap_indices = preprocess_utils.compute_scores_sep(
-        train_bow, None,
-        valid_bow, None
-    )
-    scores = scores.cpu().numpy()
-    max_overlap_indices = max_overlap_indices.cpu().numpy()
-    preprocess_utils.draw_scores(scores, prefix='valid')
-    compare_df = pd.DataFrame({
-        'score': scores,
-        'train_dialogs': [dialogs[i] for i in max_overlap_indices],
-        'eval_dialogs' : test_dialogs,
-    })
-    compare_df.sort_values('score', inplace=True)
-    compare_df.to_csv('{}.csv'.format('valid'))
+        train_bow = build_bow(train_dialogs, w2i)
+        valid_bow = build_bow(valid_dialogs, w2i)
+        test_bow = build_bow(test_dialogs, w2i)
 
-    del valid_bow
+        # Test
+        scores, max_overlap_indices = preprocess_utils.compute_scores_sep(
+            train_bow, None,
+            test_bow, None
+        )
+        scores = scores.cpu().numpy()
+        max_overlap_indices = max_overlap_indices.cpu().numpy()
+        preprocess_utils.draw_scores(scores, prefix='test')
+        compare_df = pd.DataFrame({
+            'score': scores,
+            'train_dialogs': [dialogs[i] for i in max_overlap_indices],
+            'eval_dialogs' : test_dialogs,
+        })
+        compare_df.sort_values('score', inplace=True)
+        compare_df.to_csv('{}.csv'.format('test'))
 
-    print('done!')
+        del test_bow
+
+        # Valid
+        scores, max_overlap_indices = preprocess_utils.compute_scores_sep(
+            train_bow, None,
+            valid_bow, None
+        )
+        scores = scores.cpu().numpy()
+        max_overlap_indices = max_overlap_indices.cpu().numpy()
+        preprocess_utils.draw_scores(scores, prefix='valid')
+        compare_df = pd.DataFrame({
+            'score': scores,
+            'train_dialogs': [dialogs[i] for i in max_overlap_indices],
+            'eval_dialogs' : test_dialogs,
+        })
+        compare_df.sort_values('score', inplace=True)
+        compare_df.to_csv('{}.csv'.format('valid'))
+
+        del valid_bow
+
+        print('done!')
+
+    elif args.mode == 'split':
+
+        print('splitting!')
