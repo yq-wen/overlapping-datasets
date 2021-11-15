@@ -255,18 +255,18 @@ def dump_results(train_df, eval_df, scores, max_overlap_indices, output_name):
 
     # Plot a histogram of scores
     plt.hist(scores, bins=bins)
-    plt.title('Word Overlap Distribution')
-    plt.xlabel('fraction of word overlap')
-    plt.ylabel('number of overlapped pairs'.format(output_name))
-    plt.savefig('{}_scores.png'.format(output_name))
+    plt.xlabel('Overlap Ratio', fontsize=20)
+    plt.ylabel('# of Samples', fontsize=20)
+    plt.tick_params(axis='both', which='major', labelsize=20)
+    plt.savefig('{}_scores.png'.format(output_name), bbox_inches='tight')
     plt.close()
 
     # Plot a cumulative graph of scores
     plt.hist(scores, cumulative=True, density=True, bins=bins)
-    plt.title('Cumulative Word Overlap Distribution')
-    plt.xlabel('fraction of word overlap')
-    plt.ylabel('cumulative fraction of the overlapped pairs')
-    plt.savefig('{}_cumulative_scores.png'.format(output_name))
+    plt.xlabel('Overlap Ratio', fontsize=20)
+    plt.ylabel('% Data', fontsize=20)
+    plt.tick_params(axis='both', which='major', labelsize=20)
+    plt.savefig('{}_cumulative_scores.png'.format(output_name), bbox_inches='tight')
     plt.close()
 
     for threshold in [0.00, 0.25, 0.50, 0.60, 0.75, 1.00]:
