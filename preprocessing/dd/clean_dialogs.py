@@ -78,13 +78,18 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser('Script for deduplicating and splitting dialogues')
     parser.add_argument('--mode', choices=['dedup', 'split'], default='split')
 
+    parser.add_argument('--train-path', type=str, default=TRAIN_PATH)
+    parser.add_argument('--valid-path', type=str, default=VALID_PATH)
+    parser.add_argument('--test-path', type=str, default=TEST_PATH)
+    parser.add_argument('--full-path', type=str, default=FULL_PATH)
+
     args = parser.parse_args()
 
     if args.mode == 'dedup':
 
-        train_dialogs = get_dialogs(TRAIN_PATH)
-        valid_dialogs = get_dialogs(VALID_PATH)
-        test_dialogs = get_dialogs(TEST_PATH)
+        train_dialogs = get_dialogs(args.train_path)
+        valid_dialogs = get_dialogs(args.valid_path)
+        test_dialogs = get_dialogs(args.test_path)
 
         dialogs = list(itertools.chain(train_dialogs, valid_dialogs, test_dialogs))
 
@@ -137,28 +142,41 @@ if __name__ == '__main__':
         NUM_TEST = 1000
         NUM_VALID = 1000
 
-        dialogs = get_dialogs(FULL_PATH)
-        num_dialogs = len(dialogs)
+        def sort_overlap(dialogs, w2i):
+            '''Retrives N least samples from dialogs
+            Return:
+                sorted_dialogs
+                sorted_scores
+            '''
+            num_dialogs = len(dialogs)
+            bow = build_bow(dialogs, w2i)
 
+            score_matrix = preprocess_utils.compute_score_matrix(bow, bow)
+            score_matrix[range(num_dialogs), range(num_dialogs)] = 0
+
+            overlap_values, max_overlap_indices = score_matrix.max(dim=1)
+            # increasing overlap
+            sorted_overlap_values, sorted_indices = overlap_values.sort()
+
+            sorted_dialogs = []
+            sorted_scores = []
+
+            for idx in sorted_indices:
+                sorted_dialogs.append(dialogs[idx])
+                sorted_scores.append(float(overlap_values[idx]))
+
+            return sorted_dialogs, sorted_scores
+
+        dialogs = get_dialogs(args.full_path)
         w2i = build_w2i(dialogs)
-        bow = build_bow(dialogs, w2i)
 
-        score_matrix = preprocess_utils.compute_score_matrix(bow, bow)
-        score_matrix[range(num_dialogs), range(num_dialogs)] = 0
+        # Split all dialogs into test and remaining
+        sorted_dialogs, sorted_scores = sort_overlap(dialogs, w2i)
+        test_dialogs, remaining_dialogs = sorted_dialogs[:NUM_TEST], sorted_dialogs[NUM_TEST:]
 
-        overlap_values, max_overlap_indices = score_matrix.max(dim=1)
-        # increasing overlap
-        sorted_overlap_values, sorted_indices = overlap_values.sort()
-
-        sorted_scores = []
-        sorted_dialogs = []
-        for idx in sorted_indices:
-            sorted_scores.append(float(overlap_values[idx]))
-            sorted_dialogs.append(dialogs[idx])
-
-        test_dialogs = sorted_dialogs[:NUM_TEST]
-        valid_dialogs = sorted_dialogs[NUM_TEST:NUM_TEST+NUM_VALID]
-        train_dialogs = sorted_dialogs[NUM_TEST+NUM_VALID:]
+        # Split remaining dialogs into valid and train
+        sorted_dialogs, sorted_scores = sort_overlap(remaining_dialogs, w2i)
+        valid_dialogs, train_dialogs = sorted_dialogs[:NUM_VALID], sorted_dialogs[NUM_VALID:]
 
         splits = {
             'test': test_dialogs,
