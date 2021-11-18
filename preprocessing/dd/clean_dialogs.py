@@ -21,6 +21,7 @@ from nltk.corpus import stopwords
 from collections import Counter
 from design_matrix import DesignMatrix
 from torch.utils.data import Dataset, DataLoader
+from scipy.stats import pearsonr, spearmanr, kendalltau
 
 def get_dialogs(path):
     dialogs = []
@@ -76,7 +77,7 @@ FULL_PATH = '../../data/ijcnlp_dailydialog/dialogues_text.txt'
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser('Script for deduplicating and splitting dialogues')
-    parser.add_argument('--mode', choices=['dedup', 'split'], default='split')
+    parser.add_argument('--mode', choices=['dedup', 'split', 'hsearch'], default='split')
 
     parser.add_argument('--train-path', type=str, default=TRAIN_PATH)
     parser.add_argument('--valid-path', type=str, default=VALID_PATH)
@@ -151,7 +152,7 @@ if __name__ == '__main__':
             num_dialogs = len(dialogs)
             bow = build_bow(dialogs, w2i)
 
-            score_matrix = preprocess_utils.compute_score_matrix(bow, bow)
+            score_matrix = preprocess_utils.compute_score_matrix(bow, bow, alpha=1.3)
             score_matrix[range(num_dialogs), range(num_dialogs)] = 0
 
             overlap_values, max_overlap_indices = score_matrix.max(dim=1)
@@ -195,3 +196,54 @@ if __name__ == '__main__':
                 print('{}: {} turns per dialog'.format(split_name, total_turns / num_dialogs))
 
         print('Splitting finished!')
+
+    elif args.mode == 'hsearch':
+
+        alphas = numpy.arange(0, 2.0 + 0.1, 0.1)
+        pearsons = []
+        spearmans = []
+        kendalls = []
+
+        dialogs = get_dialogs(args.full_path)
+        num_dialogs = len(dialogs)
+
+        w2i = build_w2i(dialogs)
+        bow = build_bow(dialogs, w2i)
+
+        overlap_matrix, bow_1_len_matrix, bow_2_len_matrix = preprocess_utils.compute_score_matrix_unnormalized(bow, bow)
+        len_matrix = bow_1_len_matrix + bow_2_len_matrix
+
+        for alpha in alphas:
+
+            score_matrix = overlap_matrix / torch.pow(len_matrix, alpha)
+
+            flat_scores = score_matrix.view(-1).cpu()
+            flat_len = len_matrix.view(-1).cpu()
+            total_samples = num_dialogs * num_dialogs
+            chosen_indices = torch.randint(total_samples, (5000,))
+            plt.scatter(flat_len[chosen_indices], flat_scores[chosen_indices])
+
+            pearsons.append(pearsonr(flat_len[chosen_indices], flat_scores[chosen_indices]))
+            spearmans.append(spearmanr(flat_len[chosen_indices], flat_scores[chosen_indices]))
+            kendalls.append(kendalltau(flat_len[chosen_indices], flat_scores[chosen_indices]))
+
+            plt.savefig('alpha={:.2f}.png'.format(alpha))
+            plt.close()
+
+            print('Pearson:', pearsons[-1])
+            print('Spearman:', spearmans[-1])
+            print('Kendall:', kendalls[-1])
+
+        plt.close()
+        pearson_coes = list(map(lambda x: x[0], pearsons))
+        spearmans_coes = list(map(lambda x: x[0], spearmans))
+        kendalls_coes = list(map(lambda x: x[0], kendalls))
+
+        plt.plot(alphas, pearson_coes, label='Pearson')
+        plt.plot(alphas, spearmans_coes, label='Spearman')
+        plt.plot(alphas, kendalls_coes, label='Kendall')
+
+        plt.legend()
+        plt.xlabel('alpha')
+        plt.ylabel('coefficient')
+        plt.savefig('coefficients_vs_alphas')
