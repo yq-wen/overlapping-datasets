@@ -14,6 +14,7 @@ import itertools
 import preprocess_utils
 import matplotlib.pyplot as plt
 import numpy as np
+import random
 
 from tqdm import tqdm
 from nltk import wordpunct_tokenize
@@ -29,6 +30,14 @@ def get_dialogs(path):
         for line in f:
             dialogs.append(line)
     return dialogs
+
+def get_utterances(path):
+    utterances = []
+    with open(path, mode='r') as f:
+        for line in f:
+            ut = line.strip().split('__eou__')[:-1]
+            utterances += ut
+    return utterances
 
 def build_w2i(dialogs):
     '''
@@ -74,6 +83,8 @@ VALID_PATH = '../../data/ijcnlp_dailydialog/validation/dialogues_validation.txt'
 TEST_PATH = '../../data/ijcnlp_dailydialog/test/dialogues_test.txt'
 FULL_PATH = '../../data/ijcnlp_dailydialog/dialogues_text.txt'
 
+random.seed(0)
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser('Script for deduplicating and splitting dialogues')
@@ -83,6 +94,7 @@ if __name__ == '__main__':
     parser.add_argument('--valid-path', type=str, default=VALID_PATH)
     parser.add_argument('--test-path', type=str, default=TEST_PATH)
     parser.add_argument('--full-path', type=str, default=FULL_PATH)
+    parser.add_argument('--segmentation', choices=['dialog', 'utterance'], default='dialog')
 
     args = parser.parse_args()
 
@@ -204,14 +216,31 @@ if __name__ == '__main__':
         spearmans = []
         kendalls = []
 
-        dialogs = get_dialogs(args.full_path)
-        num_dialogs = len(dialogs)
+        if args.segmentation == 'dialog':
 
-        w2i = build_w2i(dialogs)
-        bow = build_bow(dialogs, w2i)
+            dialogs = get_dialogs(args.full_path)
+            num_dialogs = len(dialogs)
 
-        overlap_matrix, bow_1_len_matrix, bow_2_len_matrix = preprocess_utils.compute_score_matrix_unnormalized(bow, bow)
-        len_matrix = bow_1_len_matrix + bow_2_len_matrix
+            w2i = build_w2i(dialogs)
+            bow = build_bow(dialogs, w2i)
+
+            overlap_matrix, bow_1_len_matrix, bow_2_len_matrix = preprocess_utils.compute_score_matrix_unnormalized(bow, bow)
+            len_matrix = bow_1_len_matrix + bow_2_len_matrix
+
+        elif args.segmentation == 'utterance':
+
+            SIZE = 10000
+
+            utterances = get_utterances(args.full_path)
+            random.shuffle(utterances)
+            utterances = utterances[:SIZE]
+            num_dialogs = SIZE
+
+            w2i = build_w2i(utterances)
+            bow = build_bow(utterances, w2i)
+
+            overlap_matrix, bow_1_len_matrix, bow_2_len_matrix = preprocess_utils.compute_score_matrix_unnormalized(bow, bow)
+            len_matrix = bow_1_len_matrix + bow_2_len_matrix
 
         for alpha in alphas:
 
