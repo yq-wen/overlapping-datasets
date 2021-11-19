@@ -108,14 +108,17 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser('Script for cleaning overlaps in DailyDialog')
     parser.add_argument('--n', type=int, default=1, help='order of ngram')
+    parser.add_argument('--train-path', type=str, default='../../data/ijcnlp_dailydialog/train/dialogues_train.txt')
+    parser.add_argument('--test-path', type=str, default='../../data/ijcnlp_dailydialog/test/dialogues_test.txt')
+    parser.add_argument('--valid-path', type=str, default='../../data/ijcnlp_dailydialog/validation/dialogues_validation.txt')
 
     args = parser.parse_args()
 
-    train_df = flatten('../../data/ijcnlp_dailydialog/train/dialogues_train.txt')
+    train_df = flatten(args.train_path)
     train_df.to_csv('train.csv', index=False)
 
-    test_df = flatten('../..//data/ijcnlp_dailydialog/test/dialogues_test.txt')
-    valid_df = flatten('../../data/ijcnlp_dailydialog/validation/dialogues_validation.txt')
+    test_df = flatten(args.test_path)
+    valid_df = flatten(args.valid_path)
 
     dfs = [train_df, test_df, valid_df]
 
