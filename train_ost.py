@@ -51,7 +51,7 @@ class BaseTrainer():
         save_every=1,
     ):
 
-        torch.manual_seed(0)
+        torch.manual_seed(args.seed)
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -267,12 +267,13 @@ class T5Trainer(BaseTrainer):
 
 if __name__ == '__main__':
 
-    np.random.seed(0)
+
 
     parser = argparse.ArgumentParser('Training script for T5')
 
     parser.add_argument('--num-training-examples', type=int, default=None)
     parser.add_argument('--dataset', type=str, default='ost')
+    parser.add_argument('--seed', type=int, default=0)
 
     parser.add_argument('--save-every', type=int, default=5)
     parser.add_argument('--eval-every', type=int, default=5)
@@ -290,11 +291,12 @@ if __name__ == '__main__':
     parser.add_argument('--model-str', type=str, default='t5-base')
 
     # Training parameters
-    parser.add_argument('--num-epochs', type=int, default=10000)
+    parser.add_argument('--num-epochs', type=int, default=1000)
     parser.add_argument('--learning-rate', type=float, default=5e-5)
-    parser.add_argument('--batch-size', type=int, default=64)
+    parser.add_argument('--batch-size', type=int, default=128)
 
     args = parser.parse_args()
+    np.random.seed(args.seed)
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_str)
     model = AutoModelWithLMHead.from_pretrained(args.model_str)
