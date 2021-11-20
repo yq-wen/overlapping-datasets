@@ -307,7 +307,7 @@ def dump_results(train_df, eval_df, scores, max_overlap_indices, output_name):
 
     draw_scores(scores, prefix=output_name)
 
-    for threshold in [0.00, 0.25, 0.50, 0.60, 0.75, 1.00]:
+    for threshold in [0.00, 0.25, 0.50, 0.60, 0.75, 0.99, 1.00]:
         drop_indices = (scores > threshold).nonzero()[0]
         print('[{}]: Dropping {} samples for scores>{}'.format(
             output_name,
