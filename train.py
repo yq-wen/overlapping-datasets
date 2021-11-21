@@ -10,6 +10,7 @@ from transformers import AutoTokenizer, AutoModelWithLMHead
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import Dataset, DataLoader
 from dailydialogue import DailyDialogueDataset
+from opensubtitles import OpenSubtitlesDataset
 from dateutil import tz
 from eval import eval_model
 from util import build_dd_tests_from_csv
@@ -49,7 +50,6 @@ class BaseTrainer():
         save_every=1,
     ):
 
-        torch.manual_seed(0)
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -249,11 +249,13 @@ class T5Trainer(BaseTrainer):
 
 if __name__ == '__main__':
 
-    np.random.seed(0)
+
 
     parser = argparse.ArgumentParser('Training script for T5')
 
     parser.add_argument('--num-training-examples', type=int, default=None)
+    parser.add_argument('--dataset', type=str, default='dd', help="dailydialogue or opensubtitles")
+    parser.add_argument('--seed', type=int, default=0)
 
     parser.add_argument('--save-every', type=int, default=1)
     parser.add_argument('--eval-every', type=int, default=1)
@@ -276,6 +278,8 @@ if __name__ == '__main__':
     parser.add_argument('--batch-size', type=int, default=64)
 
     args = parser.parse_args()
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_str)
     model = AutoModelWithLMHead.from_pretrained(args.model_str)
@@ -285,10 +289,16 @@ if __name__ == '__main__':
         max_num_dialogues=args.eval_max,
     )
 
-    dataset = DailyDialogueDataset(
-        tokenizer,
-        path=args.train_path,
-    )
+    if args.dataset=="dd":
+        dataset = DailyDialogueDataset(
+                tokenizer,
+                path=args.train_path,
+            )
+    else:
+        dataset = OpenSubtitlesDataset(
+                tokenizer,
+                path=args.train_path,
+            )
 
     if args.num_training_examples:
         indices = np.random.choice(len(dataset), size=args.num_training_examples, replace=False)
