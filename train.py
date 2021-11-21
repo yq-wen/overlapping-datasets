@@ -16,6 +16,9 @@ from eval import eval_model
 from util import build_dd_tests_from_csv
 
 
+DEFAULT_THRESHOLDS = [0.50, 0.60, 0.70, 0.75, 0.80, 0.90, 1.00]
+
+
 class Logger():
     def __init__(self, filename):
         self.terminal = sys.stdout
@@ -175,15 +178,24 @@ class BaseTrainer():
 
             print('end of epoch {}'.format(epoch))
 
+
 class T5Trainer(BaseTrainer):
 
-    def __init__(self, *args, eval_every=1, eval_tests=None, **kwargs):
+    def __init__(
+            self,
+            *args,
+            eval_every=1,
+            eval_tests=None,
+            thresholds=None,
+        **kwargs):
 
         self.eval_every = eval_every
         self.eval_tests = eval_tests
 
         self.best_metrics = {}  # map from metric (str) to the best value (float)
         self.best_path    = {}  # map from metric (str) to the path of ckpt (str)
+
+        self.thresholds = thresholds
 
         return super().__init__(*args, **kwargs)
 
@@ -215,7 +227,7 @@ class T5Trainer(BaseTrainer):
 
             with open(pathlib.PosixPath(self.log_dir, '_epoch_{}.pt.eval'.format(self.epoch)), mode='w') as f:
 
-                results = eval_model(self.eval_tests, self.model, tokenizer, stream=f, thresholds=[0.50, 0.60, 0.70, 0.75, 0.80, 0.90, 1.00])
+                results = eval_model(self.eval_tests, self.model, tokenizer, stream=f, thresholds=thresholds)
 
             for k, v in results.items():
                 print('{}: {}'.format(k, v))
@@ -246,6 +258,7 @@ class T5Trainer(BaseTrainer):
                         torch.save(self.model, save_path)
                         self.best_path[k] = save_path
 
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser('Training script for T5')
@@ -265,6 +278,7 @@ if __name__ == '__main__':
     parser.add_argument('--log-root-dir', type=str, default=BaseTrainer.LOG_ROOT_DIR)
     parser.add_argument('--log-every', type=int, default=100)
     parser.add_argument('--no-save', action='store_true')
+    parser.add_argument('--no-thresholds', action='store_true', help='when set, eval with all samples')
 
     # Model parameters
     parser.add_argument('--model-str', type=str, default='t5-base')
@@ -303,6 +317,12 @@ if __name__ == '__main__':
     else:
         train_dataset = dataset
 
+    if args.no_thresholds:
+        # Bascially, evaluate with everything (with overlap smaller or equal to 1)
+        thresholds = [1]
+    else:
+        thresholds = DEFAULT_THRESHOLDS
+
     trainer = T5Trainer(
         model=model,
         train_dataset=train_dataset,
@@ -316,6 +336,7 @@ if __name__ == '__main__':
         eval_every=args.eval_every,
         eval_tests=eval_tests,
         sanity=args.sanity,
+        thresholds=thresholds,
     )
 
     trainer.train()
