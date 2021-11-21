@@ -45,7 +45,39 @@ def get_grams(line, n=1):
     return nltk.ngrams(tokens, n=n)
 
 @profile
-def compute_score_matrix(bow_1, bow_2):
+def compute_score_matrix(bow_1, bow_2, alpha=1):
+    '''
+    Arguments:
+        bow_1: (num_bow_1_samples, vocab_size)
+        bow_2: (num_bow_2_samples, vocab_size)
+        alpha: hyper-parameter for the normalizing factor
+    Returns:
+        score_matrix (num_bow_1_samples, num_bow_2_samples): the score matrix
+            where the i-jth entry contains the overlap score of the ith sample
+            from bow_1 and the jth sample from bow_2
+    '''
+    num_1_bow_samples = bow_1.shape[0]
+    num_2_bow_samples = bow_2.shape[0]
+
+    bow_1_len = bow_1.sum(axis=1)  # (num_bow_1_samples,)
+    bow_2_len = bow_2.sum(axis=1)  # (num_bow_2_samples,)
+
+    # len_matrics all have shape: (num_bow_1_samples, num_bow_2_samples)
+    bow_1_len_matrix = torch.broadcast_to(bow_1_len, (num_2_bow_samples, num_1_bow_samples)).T
+    bow_2_len_matrix = torch.broadcast_to(bow_2_len, (num_1_bow_samples, num_2_bow_samples))
+    total_len_matrix = bow_1_len_matrix + bow_2_len_matrix
+
+    overlap_matrix = bow_1 @ bow_2.T  # (num_bow_1_samples, num_bow_2_samples)
+    score_matrix = 2 * overlap_matrix / torch.pow(total_len_matrix, alpha)
+
+    # nans happen where both sentences contain only punctuations
+    # therefore, consider them to be an exact overlap
+    score_matrix = torch.nan_to_num(score_matrix, nan=0.0)
+
+    return score_matrix
+
+@profile
+def compute_score_matrix_unnormalized(bow_1, bow_2):
     '''
     Arguments:
         bow_1: (num_bow_1_samples, vocab_size)
@@ -65,15 +97,16 @@ def compute_score_matrix(bow_1, bow_2):
     bow_1_len_matrix = torch.broadcast_to(bow_1_len, (num_2_bow_samples, num_1_bow_samples)).T
     bow_2_len_matrix = torch.broadcast_to(bow_2_len, (num_1_bow_samples, num_2_bow_samples))
     total_len_matrix = bow_1_len_matrix + bow_2_len_matrix
+    # total_len_matrix = torch.pow(bow_1_len_matrix + bow_2_len_matrix, 1.10)
 
     overlap_matrix = bow_1 @ bow_2.T  # (num_bow_1_samples, num_bow_2_samples)
-    score_matrix = 2 * overlap_matrix / total_len_matrix
+    score_matrix = overlap_matrix
 
     # nans happen where both sentences contain only punctuations
     # therefore, consider them to be an exact overlap
     score_matrix = torch.nan_to_num(score_matrix, nan=0.0)
 
-    return score_matrix
+    return overlap_matrix, bow_1_len_matrix, bow_2_len_matrix
 
 def compute_scores(train_bow, eval_bow):
 
@@ -274,7 +307,7 @@ def dump_results(train_df, eval_df, scores, max_overlap_indices, output_name):
 
     draw_scores(scores, prefix=output_name)
 
-    for threshold in [0.00, 0.25, 0.50, 0.60, 0.75, 1.00]:
+    for threshold in [0.00, 0.25, 0.50, 0.60, 0.75, 0.99, 1.00]:
         drop_indices = (scores > threshold).nonzero()[0]
         print('[{}]: Dropping {} samples for scores>{}'.format(
             output_name,

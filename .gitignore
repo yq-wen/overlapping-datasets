@@ -134,4 +134,5 @@ data/*
 !data/ijcnlp_dailydialog
 !data/wen
 !data/dedup
+!data/proposed_dailydialog/
 log/
