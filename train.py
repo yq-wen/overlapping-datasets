@@ -50,7 +50,6 @@ class BaseTrainer():
         save_every=1,
     ):
 
-
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         self.model = model
@@ -249,8 +248,6 @@ class T5Trainer(BaseTrainer):
 
 if __name__ == '__main__':
 
-
-
     parser = argparse.ArgumentParser('Training script for T5')
 
     parser.add_argument('--num-training-examples', type=int, default=None)
@@ -291,14 +288,14 @@ if __name__ == '__main__':
 
     if args.dataset=="dd":
         dataset = DailyDialogueDataset(
-                tokenizer,
-                path=args.train_path,
-            )
+            tokenizer,
+            path=args.train_path,
+        )
     else:
         dataset = OpenSubtitlesDataset(
-                tokenizer,
-                path=args.train_path,
-            )
+            tokenizer,
+            path=args.train_path,
+        )
 
     if args.num_training_examples:
         indices = np.random.choice(len(dataset), size=args.num_training_examples, replace=False)
