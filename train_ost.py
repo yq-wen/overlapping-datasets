@@ -47,11 +47,9 @@ class BaseTrainer():
         save_models=True,
         log_root_dir=None,
         sanity=False,
-        eval=False,
         save_every=1,
     ):
 
-        torch.manual_seed(args.seed)
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -66,7 +64,6 @@ class BaseTrainer():
         self.log_every = log_every
         self.save_models = save_models
         self.sanity = sanity
-        self.eval = eval
         self.batch_size = batch_size
         self.save_every = save_every
 
@@ -106,8 +103,6 @@ class BaseTrainer():
 
         # Set up dataloaders for the datasets
         self.train_loader = DataLoader(self.train_dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
-        if self.eval:
-            self.eval_loader = DataLoader(self.eval_dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
         self.num_train_batches = len(self.train_loader)
 
     def compute_loss(self, batch):
@@ -173,26 +168,13 @@ class BaseTrainer():
 
                 self.train_step_end()
 
-            # Evaluation steps
-            if self.eval:
-                self.model.eval()
-                with torch.no_grad():
-                    val_losses = []
-                    for batch_idx, batch in enumerate(self.eval_loader):
-                        loss = self.compute_loss(batch)
-                        val_losses.append(loss.item())
-                    val_loss = statistics.mean(val_losses)
-                    self.writer.add_scalar('val/loss', val_loss, self.global_step)
-
             # End of Epoch
+            self.model.eval()
             with torch.no_grad():
                 self.save()
                 self.epoch_end()
 
-            if self.eval:
-                print('end of epoch {} | val loss: {:.3f}'.format(epoch, val_loss))
-            else:
-                print('end of epoch {}'.format(epoch))
+            print('end of epoch {}'.format(epoch))
 
 class T5Trainer(BaseTrainer):
 
@@ -234,7 +216,7 @@ class T5Trainer(BaseTrainer):
 
             with open(pathlib.PosixPath(self.log_dir, '_epoch_{}.pt.eval'.format(self.epoch)), mode='w') as f:
 
-                results = eval_model(self.eval_tests, self.model, tokenizer, stream=f, thresholds=[0.40, 0.60, 0.80, 1.00])
+                results = eval_model(self.eval_tests, self.model, tokenizer, stream=f, thresholds=[0.50, 0.60, 0.70, 0.75, 0.80, 0.90, 1.00])
 
             for k, v in results.items():
                 print('{}: {}'.format(k, v))
@@ -272,14 +254,14 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser('Training script for T5')
 
     parser.add_argument('--num-training-examples', type=int, default=None)
-    parser.add_argument('--dataset', type=str, default='ost')
+    parser.add_argument('--dataset', type=str, default='dd', help="dailydialogue or opensubtitles")
     parser.add_argument('--seed', type=int, default=0)
 
-    parser.add_argument('--save-every', type=int, default=5)
-    parser.add_argument('--eval-every', type=int, default=5)
+    parser.add_argument('--save-every', type=int, default=1)
+    parser.add_argument('--eval-every', type=int, default=1)
 
-    parser.add_argument('--train-path', type=str, default='data/data_ost/df_ost_train.csv')
-    parser.add_argument('--eval-path', type=str, default='data/data_ost/test_ost_compare.csv')
+    parser.add_argument('--train-path', type=str, default='data/dedup/train_v2.csv')
+    parser.add_argument('--eval-path', type=str, default='data/dedup/test.csv')
 
     parser.add_argument('--eval-max', type=int, default=None)
     parser.add_argument('--sanity', action='store_true')
@@ -291,12 +273,13 @@ if __name__ == '__main__':
     parser.add_argument('--model-str', type=str, default='t5-base')
 
     # Training parameters
-    parser.add_argument('--num-epochs', type=int, default=1000)
+    parser.add_argument('--num-epochs', type=int, default=10000)
     parser.add_argument('--learning-rate', type=float, default=5e-5)
-    parser.add_argument('--batch-size', type=int, default=128)
+    parser.add_argument('--batch-size', type=int, default=64)
 
     args = parser.parse_args()
     np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_str)
     model = AutoModelWithLMHead.from_pretrained(args.model_str)
@@ -316,7 +299,6 @@ if __name__ == '__main__':
                 tokenizer,
                 path=args.train_path,
             )
-
 
     if args.num_training_examples:
         indices = np.random.choice(len(dataset), size=args.num_training_examples, replace=False)
