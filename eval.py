@@ -8,7 +8,7 @@ import itertools
 
 from nltk.translate.bleu_score import sentence_bleu, corpus_bleu
 from metric.bleus import i_sentence_bleu, i_corpus_bleu
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, BertTokenizer, GPT2TokenizerFast
 from util import build_dd_tests_from_csv
 from nltk.collocations import BigramCollocationFinder
 from nltk.probability import FreqDist
@@ -54,6 +54,14 @@ def generate_fn(model, tokenizer, post):
     responses = []
     self_ppls = []
 
+    input_length = len(input_ids[0])
+    max_output_length = 20
+
+    if 'gpt2' in model.name_or_path:
+        # gpt2 models' output includes input
+        # therefore add the length of the input
+        max_output_length += input_length
+
     generated = model.generate(
         input_ids=input_ids,
         # no_repeat_ngram_size=1,
@@ -61,11 +69,16 @@ def generate_fn(model, tokenizer, post):
         repetition_penalty=1.2,  # recommended in https://arxiv.org/pdf/1909.05858.pdf
         output_scores=True,
         return_dict_in_generate=True,
-        max_length=20,
+        max_length=max_output_length,
+        pad_token_id=tokenizer.pad_token_id,
     )
 
-    # generated sequence always start with decoder_start_token_id, which we ignore here
-    sequence = generated.sequences[0][1:]
+    if 'gpt2' in model.name_or_path:
+        # for gpt2 models, generated sequences always start with the input
+        sequence = generated.sequences[0][input_length:]
+    else:
+        # generated sequence always start with decoder_start_token_id, which we ignore here
+        sequence = generated.sequences[0][1:]
     scores = generated.scores
     assert len(sequence) == len(scores)
 
