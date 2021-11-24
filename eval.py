@@ -351,8 +351,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser('Script for evaluating models')
     parser.add_argument('--ckpt', type=str, default='')
     parser.add_argument('--output-file', type=str, default='')
-    parser.add_argument('--eval-path', type=str, default='preprocessing/dd/cleaned/clean_v4_2_sep_min_nsw/test_compare.csv')
-    parser.add_argument('--max-num-dialogues', type=int, default=sys.maxsize)
+    parser.add_argument('--eval-path', type=str, default='data/dedup/test.csv')
+    parser.add_argument('--max-num-dialogues', type=int, default=None)
 
     args = parser.parse_args()
 
