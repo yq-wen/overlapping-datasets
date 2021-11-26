@@ -135,4 +135,5 @@ data/*
 !data/wen
 !data/dedup
 !data/proposed_dailydialog/
+!data/precision_dailydialog/
 log/

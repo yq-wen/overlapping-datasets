@@ -209,8 +209,8 @@ if __name__ == '__main__':
 
     elif args.mode == 'split-sents':
 
-        NUM_TEST = 10000
-        NUM_VALID = 10000
+        NUM_TEST = 5000
+        NUM_VALID = 5000
 
         df = flatten(args.full_path, num_contexts=1)
         num_samples = df.shape[0]
