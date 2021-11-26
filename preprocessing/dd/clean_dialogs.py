@@ -183,13 +183,10 @@ if __name__ == '__main__':
         dialogs = get_dialogs(args.full_path)
         w2i = build_w2i(dialogs)
 
-        # Split all dialogs into test and remaining
         sorted_dialogs, sorted_scores = sort_overlap(dialogs, w2i)
-        test_dialogs, remaining_dialogs = sorted_dialogs[:NUM_TEST], sorted_dialogs[NUM_TEST:]
-
-        # Split remaining dialogs into valid and train
-        sorted_dialogs, sorted_scores = sort_overlap(remaining_dialogs, w2i)
-        valid_dialogs, train_dialogs = sorted_dialogs[:NUM_VALID], sorted_dialogs[NUM_VALID:]
+        test_dialogs = sorted_dialogs[:NUM_TEST]
+        valid_dialogs = sorted_dialogs[NUM_TEST:NUM_TEST+NUM_VALID]
+        train_dialogs = sorted_dialogs[NUM_TEST+NUM_VALID:]
 
         splits = {
             'test': test_dialogs,
