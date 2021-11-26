@@ -164,7 +164,7 @@ if __name__ == '__main__':
             num_dialogs = len(dialogs)
             bow = build_bow(dialogs, w2i)
 
-            score_matrix = preprocess_utils.compute_score_matrix(bow, bow, alpha=1.3)
+            score_matrix = preprocess_utils.compute_score_matrix(bow, bow, alpha=1)
             score_matrix[range(num_dialogs), range(num_dialogs)] = 0
 
             overlap_values, max_overlap_indices = score_matrix.max(dim=1)

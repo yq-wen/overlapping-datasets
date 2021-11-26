@@ -65,10 +65,10 @@ def compute_score_matrix(bow_1, bow_2, alpha=1):
     # len_matrics all have shape: (num_bow_1_samples, num_bow_2_samples)
     bow_1_len_matrix = torch.broadcast_to(bow_1_len, (num_2_bow_samples, num_1_bow_samples)).T
     bow_2_len_matrix = torch.broadcast_to(bow_2_len, (num_1_bow_samples, num_2_bow_samples))
-    total_len_matrix = bow_1_len_matrix + bow_2_len_matrix
+    total_len_matrix = bow_1_len_matrix
 
     overlap_matrix = bow_1 @ bow_2.T  # (num_bow_1_samples, num_bow_2_samples)
-    score_matrix = 2 * overlap_matrix / torch.pow(total_len_matrix, alpha)
+    score_matrix = torch.pow(overlap_matrix, alpha) / torch.pow(total_len_matrix, alpha)
 
     # nans happen where both sentences contain only punctuations
     # therefore, consider them to be an exact overlap
@@ -222,15 +222,15 @@ def compute_scores_sep(train_context_bow, train_response_bow, eval_context_bow, 
         max_overlap_indices (numpy array): indices of the training samples that
             generated the maximum overlap. (shape: (num_eval_samples,))
     '''
-    context_score_matrix = compute_score_matrix(train_context_bow, eval_context_bow)
+    context_score_matrix = compute_score_matrix(eval_context_bow, train_context_bow)
     # response_score_matrix = compute_score_matrix(train_response_bow, eval_response_bow)
 
     # score_matrix  = (context_score_matrix + response_score_matrix) / 2
     # score_matrix  = np.minimum(context_score_matrix, response_score_matrix)
     score_matrix = context_score_matrix
 
-    max_overlap_indices = score_matrix.argmax(axis=0)
-    scores = score_matrix[max_overlap_indices, range(score_matrix.shape[1])]
+    max_overlap_indices = score_matrix.argmax(axis=1)
+    scores = score_matrix[range(score_matrix.shape[0]), max_overlap_indices]
 
     return scores, max_overlap_indices
 
@@ -326,6 +326,10 @@ def dump_results(train_df, eval_df, scores, max_overlap_indices, output_name):
         'eval_response': eval_df['response'].reset_index(drop=True),
     })
     compare_df.sort_values('score', inplace=True)
+
+    print('[{}]: Length of least overlapping 1K: {}'.format(output_name, compare_df['eval_context'][:1000].apply(lambda x: len(list(get_grams(x)))).mean()))
+    print('[{}]: Length of most overlapping 1K: {}'.format(output_name, compare_df['eval_context'][-1000:].apply(lambda x: len(list(get_grams(x)))).mean()))
+
     compare_df.to_csv('{}.csv'.format(output_name))
 
     return
