@@ -4,6 +4,7 @@ import torch
 import statistics
 import numpy as np
 import itertools
+import random
 
 
 from nltk.translate.bleu_score import sentence_bleu, corpus_bleu
@@ -28,6 +29,8 @@ BLEU_WEIGHTS_SINGLE = [
     [0.0, 0.0, 1.0],
     [0.0, 0.0, 0.0, 1.0],
 ]
+
+DIST_NUM_SAMPLES = 1000
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -194,7 +197,8 @@ def eval_model(tests, model, tokenizer, generate_func=generate_fn, thresholds=[1
         ))
         _log()
 
-        tokens = [token for sentence in corp_model_hyps for token in sentence]
+        dist_hyps = random.sample(corp_model_hyps, k=DIST_NUM_SAMPLES)
+        tokens = [token for sentence in dist_hyps for token in sentence]
         dist_1, dist_2 = calculate_ngram_diversity(tokens)
         _log('dist_1: {:.5f}, dist_2: {:.5f}'.format(dist_1, dist_2))
 
@@ -347,6 +351,9 @@ def eval_model(tests, model, tokenizer, generate_func=generate_fn, thresholds=[1
     return final_results
 
 if __name__ == '__main__':
+
+    # For sampling in diversity calculations
+    random.seed(0)
 
     parser = argparse.ArgumentParser('Script for evaluating models')
     parser.add_argument('--ckpt', type=str, default='')
