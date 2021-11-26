@@ -23,6 +23,7 @@ from collections import Counter
 from design_matrix import DesignMatrix
 from torch.utils.data import Dataset, DataLoader
 from scipy.stats import pearsonr, spearmanr, kendalltau
+from vector_clean import flatten, df2w2i, df2bow
 
 def get_dialogs(path):
     dialogs = []
@@ -88,7 +89,7 @@ random.seed(0)
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser('Script for deduplicating and splitting dialogues')
-    parser.add_argument('--mode', choices=['dedup', 'split', 'hsearch'], default='split')
+    parser.add_argument('--mode', choices=['dedup', 'split', 'hsearch', 'split-sents'], default='split')
 
     parser.add_argument('--train-path', type=str, default=TRAIN_PATH)
     parser.add_argument('--valid-path', type=str, default=VALID_PATH)
@@ -203,6 +204,59 @@ if __name__ == '__main__':
                     num_dialogs += 1
                     total_turns += dialog.count('__eou__')
                 print('{}: {} turns per dialog'.format(split_name, total_turns / num_dialogs))
+
+        print('Splitting finished!')
+
+    elif args.mode == 'split-sents':
+
+        NUM_TEST = 10000
+        NUM_VALID = 10000
+
+        df = flatten(args.full_path, num_contexts=1)
+        num_samples = df.shape[0]
+
+        w2i = df2w2i(df, n=1)
+        bow = df2bow(df, w2i, n=1)
+
+        design_matrix = DesignMatrix(w2i, df, n=1)
+
+        overlap_values, max_overlap_indices = preprocess_utils.batch_compute_self_overlap(design_matrix, 1024, bow, verbose=True)
+        # increasing overlap
+        sorted_overlap_values, sorted_indices = overlap_values.sort()
+
+        compare_df = pd.DataFrame({
+            'score': sorted_overlap_values.cpu().numpy(),
+            'train_context': df['context'][max_overlap_indices[sorted_indices].cpu().numpy()].reset_index(drop=True),
+            'train_response': df['response'][max_overlap_indices[sorted_indices].cpu().numpy()].reset_index(drop=True),
+            'eval_context': df['context'][sorted_indices.cpu().numpy()].reset_index(drop=True),
+            'eval_response': df['response'][sorted_indices.cpu().numpy()].reset_index(drop=True),
+        })
+        compare_df.to_csv('compare.csv')
+
+        # Drop scores with 0 overlap, because they are generally short
+        # sentences that only contains very rare words
+        modified_df = compare_df[compare_df['score'] != 0].reset_index()
+
+        test_df = pd.DataFrame({
+            'context': modified_df['eval_context'][:NUM_TEST],
+            'response': modified_df['eval_response'][:NUM_TEST]
+        })
+        test_df.to_csv('test.csv', index=False)
+        print('Test Avg Length:', test_df['context'].apply(lambda x: len(list(preprocess_utils.get_grams(x)))).mean())
+
+        valid_df = pd.DataFrame({
+            'context': modified_df['eval_context'][NUM_TEST:NUM_TEST+NUM_VALID],
+            'response': modified_df['eval_response'][NUM_TEST:NUM_TEST+NUM_VALID]
+        })
+        valid_df.to_csv('valid.csv', index=False)
+        print('Valid Avg Length:', valid_df['context'].apply(lambda x: len(list(preprocess_utils.get_grams(x)))).mean())
+
+        train_df = pd.DataFrame({
+            'context': modified_df['eval_context'][NUM_TEST+NUM_VALID:],
+            'response': modified_df['eval_response'][NUM_TEST+NUM_VALID:]
+        })
+        train_df.to_csv('train.csv', index=False)
+        print('Train Avg Length:', train_df['context'].apply(lambda x: len(list(preprocess_utils.get_grams(x)))).mean())
 
         print('Splitting finished!')
 

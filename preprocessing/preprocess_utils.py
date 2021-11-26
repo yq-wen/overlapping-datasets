@@ -234,6 +234,24 @@ def compute_scores_sep(train_context_bow, train_response_bow, eval_context_bow, 
 
     return scores, max_overlap_indices
 
+def compute_scores_mask(train_bow, eval_bow, mask_indices):
+    '''
+    Arguments:
+        mask_indices (num_train_samples,): indicates which ones in eval samples
+        to mask out
+    '''
+    num_train_samples = train_bow.shape[0]
+
+    score_matrix = compute_score_matrix(eval_bow, train_bow)
+
+    # mask out scores against itself
+    assert score_matrix[mask_indices, range(num_train_samples)].all()
+    score_matrix[mask_indices, range(num_train_samples)] = 0
+
+    max_overlap_indices = score_matrix.argmax(axis=1)
+    scores = score_matrix[range(score_matrix.shape[0]), max_overlap_indices]
+    return scores, max_overlap_indices
+
 @profile
 def batch_compute_scores_sep(
         design_matrix, batch_size,
@@ -256,6 +274,44 @@ def batch_compute_scores_sep(
         local_scores, local_max_overlap_indices = compute_scores_sep(
             batch_train_context_bow, batch_train_response_bow,
             eval_context_bow, eval_response_bow
+        )
+        local_max_overlap_indices += batch_idx * batch_size
+
+        if batch_idx == 0:
+            final_scores = local_scores
+            final_max_overlap_indices = local_max_overlap_indices
+        else:
+
+            # After stacking, both has shape: (2, num_eval_samples)
+            stacked_scores = torch.stack((local_scores, final_scores), 0)
+            stacked_max_overlap_indices = torch.stack(
+                (local_max_overlap_indices, final_max_overlap_indices), 0
+            )
+
+            # Select the better of the two
+            args = stacked_scores.argmax(dim=0)
+            final_scores = stacked_scores[args, range(num_eval_samples)]
+            final_max_overlap_indices = stacked_max_overlap_indices[args, range(num_eval_samples)]
+
+    return final_scores, final_max_overlap_indices
+
+def batch_compute_self_overlap(
+        design_matrix, batch_size, bow, verbose=False,
+    ):
+
+    loader = DataLoader(design_matrix, batch_size=batch_size, pin_memory=True)
+
+    for batch_idx, batch in enumerate(loader):
+
+        if verbose:
+            print('batch: {}/{}'.format(batch_idx, len(loader)))
+
+        batch_bow = batch.cuda()
+
+        num_eval_samples = bow.shape[0]
+
+        local_scores, local_max_overlap_indices = compute_scores_mask(
+            batch_bow, bow, range(batch_idx * batch_size, batch_idx * batch_size + batch_bow.shape[0])
         )
         local_max_overlap_indices += batch_idx * batch_size
 
