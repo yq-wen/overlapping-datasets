@@ -16,7 +16,7 @@ from eval import eval_model
 from util import build_dd_tests_from_csv
 
 
-DEFAULT_THRESHOLDS = [0.50, 0.60, 0.70, 0.75, 0.80, 0.90, 1.00]
+DEFAULT_THRESHOLDS = [0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 1.00]
 
 
 class Logger():
