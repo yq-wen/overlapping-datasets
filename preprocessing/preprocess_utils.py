@@ -21,7 +21,7 @@ def profile(f):
     def wrap(*args, **kwargs):
         start = time.time()
         ret = f(*args, **kwargs)
-        print('Function {} took: {:.2f} seconds'.format(f.__name__, time.time() - start))
+        # print('Function {} took: {:.2f} seconds'.format(f.__name__, time.time() - start))
         return ret
     return wrap
 
@@ -65,10 +65,10 @@ def compute_score_matrix(bow_1, bow_2, alpha=1):
     # len_matrics all have shape: (num_bow_1_samples, num_bow_2_samples)
     bow_1_len_matrix = torch.broadcast_to(bow_1_len, (num_2_bow_samples, num_1_bow_samples)).T
     bow_2_len_matrix = torch.broadcast_to(bow_2_len, (num_1_bow_samples, num_2_bow_samples))
-    total_len_matrix = bow_1_len_matrix
+    total_len_matrix = bow_1_len_matrix + bow_2_len_matrix
 
     overlap_matrix = bow_1 @ bow_2.T  # (num_bow_1_samples, num_bow_2_samples)
-    score_matrix = torch.pow(overlap_matrix, alpha) / torch.pow(total_len_matrix, alpha)
+    score_matrix = 2 * overlap_matrix / torch.pow(total_len_matrix, alpha)
 
     # nans happen where both sentences contain only punctuations
     # therefore, consider them to be an exact overlap
@@ -373,6 +373,7 @@ def dump_results(train_df, eval_df, scores, max_overlap_indices, output_name):
         ))
         dropped_df = eval_df.drop(drop_indices)
         dropped_df.to_csv('{}_threshold_{}.csv'.format(output_name, threshold), index=False)
+        print('[{}, th={}]: Avg token length: {}'.format(output_name, threshold, dropped_df['context'].apply(lambda x: len(list(get_grams(x)))).mean()))
 
     compare_df = pd.DataFrame({
         'score': scores,

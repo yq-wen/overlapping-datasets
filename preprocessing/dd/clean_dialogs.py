@@ -10,6 +10,7 @@ import scipy
 import nltk
 import torch
 import itertools
+import statistics
 
 import preprocess_utils
 import matplotlib.pyplot as plt
@@ -204,6 +205,10 @@ if __name__ == '__main__':
                     num_dialogs += 1
                     total_turns += dialog.count('__eou__')
                 print('{}: {} turns per dialog'.format(split_name, total_turns / num_dialogs))
+                print('{}: avg. total tokens: {}'.format(split_name,
+                statistics.mean(
+                    map(lambda x: len(list(preprocess_utils.get_grams(x.replace('__eou__', '')))), split_dialogs)
+                )))
 
         print('Splitting finished!')
 

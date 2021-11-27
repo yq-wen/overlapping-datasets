@@ -116,6 +116,7 @@ if __name__ == '__main__':
 
     train_df = flatten(args.train_path)
     train_df.to_csv('train.csv', index=False)
+    print('[train], avg # tokens', train_df['context'].apply(lambda x: len(list(preprocess_utils.get_grams(x)))).mean())
 
     test_df = flatten(args.test_path)
     valid_df = flatten(args.valid_path)
@@ -148,7 +149,7 @@ if __name__ == '__main__':
     test_scores, test_max_overlap_indices = preprocess_utils.batch_compute_scores_sep(
         design_matrix, 1024,
         test_context_bow, None,
-        verbose=True,
+        verbose=False,
     )
     preprocess_utils.dump_results(train_df, test_df, test_scores, test_max_overlap_indices, 'test')
     del test_context_bow
@@ -158,7 +159,7 @@ if __name__ == '__main__':
     valid_scores, valid_max_overlap_indices = preprocess_utils.batch_compute_scores_sep(
         design_matrix, 1024,
         valid_context_bow, None,
-        verbose=True,
+        verbose=False,
     )
     preprocess_utils.dump_results(train_df, valid_df, valid_scores, valid_max_overlap_indices, 'valid')
     del valid_context_bow
