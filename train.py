@@ -211,9 +211,9 @@ class T5Trainer(BaseTrainer):
     def epoch_end(self):
 
         def _is_save_metric(metric_str):
-            if 'corp_model_bleu1' in metric_str:
+            if 'corp_model_bleu2' in metric_str:
                 return True
-            if 'corp_model_ibleu1' in metric_str:
+            if 'corp_model_ibleu2' in metric_str:
                 return True
             if 'corp_model_bleu4' in metric_str:
                 return True
