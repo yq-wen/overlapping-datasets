@@ -118,10 +118,19 @@ def calculate_ngram_diversity(corpus):
         bi_diversity: distinct-2 score
     """
     bigram_finder = BigramCollocationFinder.from_words(corpus)
-    bi_diversity = len(bigram_finder.ngram_fd) / bigram_finder.N
+    try:
+        bi_diversity = len(bigram_finder.ngram_fd) / bigram_finder.N
+    except ZeroDivisionError:
+        print('Division by zero in dist-2 calcluation')
+        bi_diversity = 0
 
     dist = FreqDist(corpus)
-    uni_diversity = len(dist) / len(corpus)
+
+    try:
+        uni_diversity = len(dist) / len(corpus)
+    except ZeroDivisionError:
+        print('Division by zero in dist-1 calcluation')
+        uni_diversity = 0
 
     return uni_diversity, bi_diversity
 
