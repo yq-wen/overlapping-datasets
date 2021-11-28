@@ -30,8 +30,6 @@ BLEU_WEIGHTS_SINGLE = [
     [0.0, 0.0, 0.0, 1.0],
 ]
 
-DIST_NUM_SAMPLES = 1000
-
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
@@ -127,7 +125,15 @@ def calculate_ngram_diversity(corpus):
 
     return uni_diversity, bi_diversity
 
-def eval_model(tests, model, tokenizer, generate_func=generate_fn, thresholds=[1.0], stream=None):
+def eval_model(
+        tests,
+        model,
+        tokenizer,
+        generate_func=generate_fn,
+        thresholds=[1.0],
+        stream=None,
+        num_dist_samples=None,
+    ):
     '''
     Arguments:
         tests (list): a list of namedtuples, each containing score (float),
@@ -200,7 +206,10 @@ def eval_model(tests, model, tokenizer, generate_func=generate_fn, thresholds=[1
         ))
         _log()
 
-        dist_hyps = random.sample(corp_model_hyps, k=DIST_NUM_SAMPLES)
+        if num_dist_samples:
+            dist_hyps = random.sample(corp_model_hyps, k=num_dist_samples)
+        else:
+            dist_hyps = corp_model_hyps
         tokens = [token for sentence in dist_hyps for token in sentence]
         dist_1, dist_2 = calculate_ngram_diversity(tokens)
         _log('dist_1: {:.5f}, dist_2: {:.5f}'.format(dist_1, dist_2))

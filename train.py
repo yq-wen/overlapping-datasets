@@ -226,7 +226,14 @@ class T5Trainer(BaseTrainer):
 
             with open(pathlib.PosixPath(self.log_dir, '_epoch_{}.pt.eval'.format(self.epoch)), mode='w') as f:
 
-                results = eval_model(self.eval_tests, self.model, tokenizer, stream=f, thresholds=thresholds)
+                results = eval_model(
+                    self.eval_tests,
+                    self.model,
+                    tokenizer,
+                    stream=f,
+                    thresholds=thresholds,
+                    num_dist_samples=args.num_dist_samples,
+                )
 
             for k, v in results.items():
                 print('{}: {}'.format(k, v))
@@ -278,6 +285,7 @@ if __name__ == '__main__':
     parser.add_argument('--log-every', type=int, default=100)
     parser.add_argument('--no-save', action='store_true')
     parser.add_argument('--no-thresholds', action='store_true', help='when set, eval with all samples')
+    parser.add_argument('--num-dist-samples', type=int, default=None)
 
     # Model parameters
     parser.add_argument('--model-str', type=str, default='t5-base')
