@@ -41,7 +41,7 @@ def str_tokenize(sent):
     '''
     return word_tokenize(sent)
 
-def generate_fn(model, tokenizer, post):
+def generate_fn(model, tokenizer, post, max_length):
     '''
     Arguments:
         model (MultiDecoderT5)
@@ -58,8 +58,8 @@ def generate_fn(model, tokenizer, post):
     responses = []
     self_ppls = []
 
+    max_output_length = max_length
     input_length = len(input_ids[0])
-    max_output_length = 64
 
     if 'gpt2' in model.name_or_path:
         # gpt2 models' output includes input
@@ -142,6 +142,7 @@ def eval_model(
         thresholds=[1.0],
         stream=None,
         num_dist_samples=None,
+        max_length=64,
     ):
     '''
     Arguments:
@@ -269,7 +270,7 @@ def eval_model(
 
         overlap_scores[i] = score
 
-        generated_responses, self_ppls = generate_func(model, tokenizer, context)
+        generated_responses, self_ppls = generate_func(model, tokenizer, context, max_length=max_length)
 
         inp = str_tokenize(context)
         corp_inps.append(inp)

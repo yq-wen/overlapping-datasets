@@ -233,36 +233,39 @@ class T5Trainer(BaseTrainer):
                     stream=f,
                     thresholds=thresholds,
                     num_dist_samples=args.num_dist_samples,
+                    max_length=args.max_length,
                 )
 
             for k, v in results.items():
                 print('{}: {}'.format(k, v))
                 self.writer.add_scalar(k, v, self.global_step)
 
-            # saving the best ckpt
-            for k, v in results.items():
+            if self.save_models:
 
-                save = False
+                # saving the best ckpt
+                for k, v in results.items():
 
-                if _is_save_metric(k):
+                    save = False
 
-                    # initialization
-                    if k not in self.best_metrics or k not in self.best_path:
-                        save = True
-                    else:
-                        save = v > self.best_metrics[k]
-                        # remove previous ckpt
+                    if _is_save_metric(k):
+
+                        # initialization
+                        if k not in self.best_metrics or k not in self.best_path:
+                            save = True
+                        else:
+                            save = v > self.best_metrics[k]
+                            # remove previous ckpt
+                            if save:
+                                self.best_path[k].unlink()
+
                         if save:
-                            self.best_path[k].unlink()
-
-                    if save:
-                        self.best_metrics[k] = v
-                        save_name = 'best_{}_epoch_{}.pt'.format(k, self.epoch)
-                        # / for organizing tensorboard, but can't use / for save path
-                        save_name = save_name.replace('/', '_')
-                        save_path = pathlib.PosixPath(self.log_dir, save_name)
-                        torch.save(self.model, save_path)
-                        self.best_path[k] = save_path
+                            self.best_metrics[k] = v
+                            save_name = 'best_{}_epoch_{}.pt'.format(k, self.epoch)
+                            # / for organizing tensorboard, but can't use / for save path
+                            save_name = save_name.replace('/', '_')
+                            save_path = pathlib.PosixPath(self.log_dir, save_name)
+                            torch.save(self.model, save_path)
+                            self.best_path[k] = save_path
 
 
 if __name__ == '__main__':
@@ -286,6 +289,7 @@ if __name__ == '__main__':
     parser.add_argument('--no-save', action='store_true')
     parser.add_argument('--no-thresholds', action='store_true', help='when set, eval with all samples')
     parser.add_argument('--num-dist-samples', type=int, default=None)
+    parser.add_argument('--max-length', type=int, default=64, help='maximum utterance length (# of tokens)')
 
     # Model parameters
     parser.add_argument('--model-str', type=str, default='t5-base')
@@ -320,11 +324,13 @@ if __name__ == '__main__':
         dataset = DailyDialogueDataset(
             tokenizer,
             path=args.train_path,
+            max_length=args.max_length,
         )
     else:
         dataset = OpenSubtitlesDataset(
             tokenizer,
             path=args.train_path,
+            max_length=args.max_length,
         )
 
     if args.num_training_examples:
