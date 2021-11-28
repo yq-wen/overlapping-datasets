@@ -52,13 +52,16 @@ def generate_fn(model, tokenizer, post):
         tuple (list<str>, list<float>): ([resp1, resp2, ...], [score1, score2, ...])
     '''
 
+    if 'gpt2' in model.name_or_path:
+        post += ' ' + tokenizer.sep_token
+
     input_ids = tokenizer.encode(post, return_tensors='pt').to(device)
 
     responses = []
     self_ppls = []
 
     input_length = len(input_ids[0])
-    max_output_length = 20
+    max_output_length = 64
 
     if 'gpt2' in model.name_or_path:
         # gpt2 models' output includes input

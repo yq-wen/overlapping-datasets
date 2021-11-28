@@ -72,39 +72,64 @@ class RawDailyDialogueDataset(Dataset):
 
 class DailyDialogueDataset(Dataset):
 
-    def __init__(self, tokenizer, max_length=20, path=None):
+    def __init__(self, tokenizer, max_length=64, path=None):
 
         df = pd.read_csv(path)
 
-        contexts = []
-        responses = []
+        if 'gpt2' in tokenizer.name_or_path:
 
-        for index, row in df.iterrows():
-            contexts.append(row['context'])
-            responses.append(row['response'])
+            samples = []
 
-        inputs = tokenizer(
-            contexts,
-            max_length=max_length,
-            truncation=True,
-            padding='max_length',
-            return_tensors='pt',
-        )
+            for index, row in df.iterrows():
+                samples.append('{} {} {} {}'.format(row['context'], tokenizer.sep_token, row['response'], tokenizer.eos_token))
 
-        labels = tokenizer(
-            responses,
-            max_length=max_length,
-            truncation=True,
-            padding='max_length',
-            return_tensors='pt',
-        )
-        labels['input_ids'][labels['attention_mask'] == 0] = -100
+            encoded = tokenizer(
+                samples,
+                max_length=max_length * 2,
+                truncation=True,
+                padding='max_length',
+                return_tensors='pt',
+            )
 
-        self.data = dict()
-        self.data['input_ids'] = inputs['input_ids']
-        self.data['attention_mask'] = inputs['attention_mask']
-        self.data['labels'] = labels['input_ids']
+            self.data = dict()
+            self.data['input_ids'] = encoded['input_ids']
+            self.data['attention_mask'] = encoded['attention_mask']
 
+            labels = encoded['input_ids'].clone()
+            labels[encoded['attention_mask'] == 0] = -100
+
+            self.data['labels'] = labels
+
+        else:
+
+            contexts = []
+            responses = []
+
+            for index, row in df.iterrows():
+                contexts.append(row['context'])
+                responses.append(row['response'])
+
+            inputs = tokenizer(
+                contexts,
+                max_length=max_length,
+                truncation=True,
+                padding='max_length',
+                return_tensors='pt',
+            )
+
+            labels = tokenizer(
+                responses,
+                max_length=max_length,
+                truncation=True,
+                padding='max_length',
+                return_tensors='pt',
+            )
+            labels['input_ids'][labels['attention_mask'] == 0] = -100
+
+            self.data = dict()
+            self.data['input_ids'] = inputs['input_ids']
+            self.data['attention_mask'] = inputs['attention_mask']
+            self.data['labels'] = labels['input_ids']
 
     def __getitem__(self, index):
         return {
