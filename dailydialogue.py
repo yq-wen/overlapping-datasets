@@ -85,21 +85,21 @@ class DailyDialogueDataset(Dataset):
                 contexts.append(row['context'].strip())
                 responses.append(tokenizer.sep_token + ' ' + row['response'].strip() + ' ' + tokenizer.eos_token)
 
-                context_encoded = tokenizer(
-                    contexts,
-                    max_length=max_length-1 ,
-                    truncation=True,
-                    padding='max_length',
-                    return_tensors='pt',
-                )
+            context_encoded = tokenizer(
+                contexts,
+                max_length=max_length-1 ,
+                truncation=True,
+                padding='max_length',
+                return_tensors='pt',
+            )
 
-                response_encoded = tokenizer(
-                    responses,
-                    max_length=max_length+1,
-                    truncation=True,
-                    padding='max_length',
-                    return_tensors='pt',
-                )
+            response_encoded = tokenizer(
+                responses,
+                max_length=max_length+1,
+                truncation=True,
+                padding='max_length',
+                return_tensors='pt',
+            )
 
             input_ids = torch.cat((context_encoded.input_ids, response_encoded.input_ids), dim=1)
             attention_mask = torch.cat((context_encoded.attention_mask, response_encoded.attention_mask), dim=1)
