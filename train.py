@@ -158,15 +158,14 @@ class BaseTrainer():
                     scaler.step(self.optimizer)
                     scaler.update()
 
-                    self.writer.add_scalar('train/loss', loss, self.global_step)
-                    self.writer.add_scalar('epoch', self.epoch, self.global_step)
-
-                    self.global_step += 1
-
                     if batch_idx % self.log_every == 0:
+                        self.writer.add_scalar('train/loss', loss, self.global_step)
+                        self.writer.add_scalar('epoch', self.epoch, self.global_step)
                         print('train | epoch: {} | {}/{} | loss: {:.3f}'.format(
                             epoch, batch_idx, self.num_train_batches, loss
                         ))
+
+                    self.global_step += 1
 
                 self.train_step_end()
 
