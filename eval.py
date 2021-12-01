@@ -99,6 +99,11 @@ def generate_fn(model, tokenizer, post, max_length):
 
     return responses, self_ppls
 
+def gen_from_text(model, tokenizer, post, max_length):
+    global gen_i
+    gen_i += 1
+    return [gen_responses[gen_i - 1]], [0]
+
 def calc_pairwise_bleu(hyps):
     '''Given a list of hypothesis, calculate the pairwise BLEU
     '''
@@ -154,7 +159,9 @@ def eval_model(
         dict: metric (str) -> value (float)
     '''
 
-    assert not model.training
+    # model could be a dummy variable
+    if model:
+        assert not model.training
 
     def _log(*args):
         if stream:
@@ -381,14 +388,24 @@ if __name__ == '__main__':
     parser.add_argument('--ckpt', type=str, default='')
     parser.add_argument('--output-file', type=str, default='')
     parser.add_argument('--eval-path', type=str, default='data/dedup/test.csv')
+    # parser.add_argument('--eval-path', type=str, default='data/alpha_1.0_dailydialog/utterances/test.csv')
     parser.add_argument('--max-num-dialogues', type=int, default=None)
+    parser.add_argument('--gen-from-text', action='store_true')
+    parser.add_argument('--generated-path', type=str, default='')
 
     args = parser.parse_args()
 
-    model = torch.load(args.ckpt, map_location=device)
-    model.eval()
-
-    tokenizer = AutoTokenizer.from_pretrained("t5-base")
+    if args.gen_from_text:
+        assert args.generated_path
+        with open(args.generated_path, mode='r') as f:
+             gen_responses = f.readlines()
+             gen_i = 0
+        model = None
+        tokenizer = None
+    else:
+        model = torch.load(args.ckpt, map_location=device)
+        model.eval()
+        tokenizer = AutoTokenizer.from_pretrained("t5-base")
 
     tests = build_dd_tests_from_csv(
         path=args.eval_path,
@@ -397,7 +414,12 @@ if __name__ == '__main__':
 
     if args.output_file:
         stream = open(args.output_file, mode='w')
+    elif args.gen_from_text:
+        stream = open(args.generated_path + '.test', mode='w')
     else:
         stream = open(args.ckpt + '.test', mode='w')
 
-    print(eval_model(tests, model, tokenizer, stream=stream, thresholds=[0.25, 0.50, 0.75, 1.00]))
+    if args.gen_from_text:
+        print(eval_model(tests, model, tokenizer, stream=stream, thresholds=[0.25, 0.50, 0.75, 1.00], generate_func=gen_from_text))
+    else:
+        print(eval_model(tests, model, tokenizer, stream=stream, thresholds=[1.00]))
