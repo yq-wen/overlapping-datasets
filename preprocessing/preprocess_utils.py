@@ -234,15 +234,24 @@ def compute_scores_sep(train_context_bow, train_response_bow, eval_context_bow, 
 
     return scores, max_overlap_indices
 
-def compute_scores_mask(train_bow, eval_bow, mask_indices):
+def compute_scores_mask(
+        train_context_bow,
+        eval_context_bow,
+        train_response_bow,
+        eval_response_bow,
+        mask_indices
+    ):
     '''
     Arguments:
         mask_indices (num_train_samples,): indicates which ones in eval samples
         to mask out
     '''
-    num_train_samples = train_bow.shape[0]
+    num_train_samples = train_context_bow.shape[0]
 
-    score_matrix = compute_score_matrix(eval_bow, train_bow)
+    context_score_matrix = compute_score_matrix(eval_context_bow, train_context_bow)
+    response_score_matrix = compute_score_matrix(eval_response_bow, train_response_bow)
+
+    score_matrix = torch.minimum(context_score_matrix, response_score_matrix)
 
     # mask out scores against itself
     assert score_matrix[mask_indices, range(num_train_samples)].all()
@@ -296,7 +305,7 @@ def batch_compute_scores_sep(
     return final_scores, final_max_overlap_indices
 
 def batch_compute_self_overlap(
-        design_matrix, batch_size, bow, verbose=False,
+        design_matrix, batch_size, context_bow, response_bow, verbose=False,
     ):
 
     loader = DataLoader(design_matrix, batch_size=batch_size, pin_memory=True)
@@ -306,12 +315,17 @@ def batch_compute_self_overlap(
         if verbose:
             print('batch: {}/{}'.format(batch_idx, len(loader)))
 
-        batch_bow = batch.cuda()
+        batch_context_bow = batch['context_bow'].cuda()
+        batch_response_bow = batch['response_bow'].cuda()
 
-        num_eval_samples = bow.shape[0]
+        num_eval_samples = context_bow.shape[0]
 
         local_scores, local_max_overlap_indices = compute_scores_mask(
-            batch_bow, bow, range(batch_idx * batch_size, batch_idx * batch_size + batch_bow.shape[0])
+            batch_context_bow,
+            context_bow,
+            batch_response_bow,
+            response_bow,
+            range(batch_idx * batch_size, batch_idx * batch_size + batch_context_bow.shape[0])
         )
         local_max_overlap_indices += batch_idx * batch_size
 

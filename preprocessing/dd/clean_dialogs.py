@@ -24,7 +24,7 @@ from collections import Counter
 from design_matrix import DesignMatrix
 from torch.utils.data import Dataset, DataLoader
 from scipy.stats import pearsonr, spearmanr, kendalltau
-from vector_clean import flatten, df2w2i, df2bow
+from vector_clean import flatten, df2w2i, df2bow, df2bows
 
 def get_dialogs(path):
     dialogs = []
@@ -90,7 +90,7 @@ random.seed(0)
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser('Script for deduplicating and splitting dialogues')
-    parser.add_argument('--mode', choices=['dedup', 'split', 'hsearch', 'split-sents'], default='split')
+    parser.add_argument('--mode', choices=['dedup', 'split', 'hsearch', 'split-sents', 'remove-dup-dialogs'], default='split')
 
     parser.add_argument('--train-path', type=str, default=TRAIN_PATH)
     parser.add_argument('--valid-path', type=str, default=VALID_PATH)
@@ -149,6 +149,71 @@ if __name__ == '__main__':
         compare_df.to_csv('{}.csv'.format('valid'))
 
         del valid_bow
+
+        print('done!')
+
+    if args.mode == 'remove-dup-dialogs':
+        '''Examine the full dailydialog dataset, and then outputs a file
+        containing unique dialogs.
+        '''
+        dialogs = get_dialogs(args.full_path)
+        num_dialogs = len(dialogs)
+        w2i = build_w2i(dialogs)
+        bow = build_bow(dialogs, w2i)
+
+        score_matrix = preprocess_utils.compute_score_matrix(bow, bow)
+        # mask out overlap with itself
+        score_matrix[range(num_dialogs), range(num_dialogs)] = 0
+
+        overlap, overlap_indices = score_matrix.max(dim=1)
+        plt.hist(overlap.cpu().numpy(), bins=np.arange(0.00, 1.00+0.05, 0.05))
+        plt.xticks(np.arange(0.00, 1.00+0.10, 0.10))
+        plt.savefig('starting_overlap_hist.png')
+        plt.clf()
+        plt.hist(overlap.cpu().numpy(), cumulative=True, density=True, bins=np.arange(0.00, 1.00+0.05, 0.05))
+        plt.xticks(np.arange(0.00, 1.00+0.10, 0.10))
+        plt.savefig('starting_overlap_cumulative.png')
+        plt.clf()
+
+        sorted_overlap_values, sorted_indices = overlap.sort()
+        compare_df = pd.DataFrame({
+            'score': sorted_overlap_values.cpu().numpy(),
+            'dialog_1': [dialogs[i] for i in overlap_indices[sorted_indices].cpu().numpy()],
+            'dialog_2': [dialogs[i] for i in sorted_indices.cpu().numpy()],
+        })
+        compare_df.to_csv('compare_before.csv')
+
+        drop = []
+        keep = []
+        new_dialogs = []
+
+        for i in range(num_dialogs):
+            if overlap[i] > 0.75 and i not in keep:
+                drop.append(i)
+                keep.append(int(overlap_indices[i]))
+            else:
+                new_dialogs.append(dialogs[i])
+
+        new_num_dialogs = len(new_dialogs)
+        new_bow = build_bow(new_dialogs, w2i)
+
+        score_matrix = preprocess_utils.compute_score_matrix(new_bow, new_bow)
+        # mask out overlap with itself
+        score_matrix[range(new_num_dialogs), range(new_num_dialogs)] = 0
+
+        overlap, overlap_indices = score_matrix.max(dim=1)
+        plt.hist(overlap.cpu().numpy(), bins=np.arange(0.00, 1.00+0.05, 0.05))
+        plt.xticks(np.arange(0.00, 1.00+0.10, 0.10))
+        plt.savefig('updated_overlap_hist.png')
+        plt.clf()
+        plt.hist(overlap.cpu().numpy(), cumulative=True, density=True, bins=np.arange(0.00, 1.00+0.05, 0.05))
+        plt.xticks(np.arange(0.00, 1.00+0.10, 0.10))
+        plt.savefig('updated_overlap_cumulative.png')
+        plt.clf()
+
+        print('{} duplicate dialogs removed!'.format(len(drop)))
+        with open('dedup_dialogs.txt', mode='w') as f:
+            f.writelines(new_dialogs)
 
         print('done!')
 
@@ -221,13 +286,19 @@ if __name__ == '__main__':
         num_samples = df.shape[0]
 
         w2i = df2w2i(df, n=1)
-        bow = df2bow(df, w2i, n=1)
+        context_bow, response_bow = df2bows(df, w2i, n=1)
 
         design_matrix = DesignMatrix(w2i, df, n=1)
 
-        overlap_values, max_overlap_indices = preprocess_utils.batch_compute_self_overlap(design_matrix, 1024, bow, verbose=True)
+        overlap_values, max_overlap_indices = preprocess_utils.batch_compute_self_overlap(design_matrix, 1024, context_bow, response_bow, verbose=True)
         # increasing overlap
         sorted_overlap_values, sorted_indices = overlap_values.sort()
+
+        plt.hist(overlap_values.cpu().numpy())
+        plt.savefig('self_overlap.png')
+        print('done!')
+
+        sys.exit(0)
 
         compare_df = pd.DataFrame({
             'score': sorted_overlap_values.cpu().numpy(),

@@ -50,7 +50,7 @@ def df2w2i(df, n=1):
     # Build the counter
     counter = Counter()
     for idx, row in tqdm(df.iterrows(), total=df.shape[0]):
-        line = row['context']
+        line = row['context'] + row['response']
         grams = preprocess_utils.get_grams(line, n=n)
         for gram in grams:
             counter[gram] += 1
@@ -120,6 +120,13 @@ if __name__ == '__main__':
 
     test_df = flatten(args.test_path)
     valid_df = flatten(args.valid_path)
+
+    # train_df = pd.read_csv('../../data/precision_dailydialog/train.csv')
+    # test_df = pd.read_csv('../../data/precision_dailydialog/test.csv')
+    # valid_df = pd.read_csv('../../data/precision_dailydialog/valid.csv')
+    # train_df = pd.read_csv('ost_train.txt', sep='\t')
+    # test_df = pd.read_csv('ost_test.txt', sep='\t')
+    # valid_df = pd.read_csv('ost_valid.txt', sep='\t')
 
     dfs = [train_df, test_df, valid_df]
 
