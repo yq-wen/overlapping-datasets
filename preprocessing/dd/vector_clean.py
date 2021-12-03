@@ -84,8 +84,8 @@ def df2bows(df, w2i, n=1):
     num_examples = df.shape[0]
     vocab_size = len(w2i)
 
-    context_bow = torch.zeros((num_examples, vocab_size))
-    response_bow = torch.zeros((num_examples, vocab_size))
+    context_bow = torch.zeros((num_examples, vocab_size), dtype=torch.float16)
+    response_bow = torch.zeros((num_examples, vocab_size), dtype=torch.float16)
 
     for idx, row in tqdm(df.iterrows(), total=df.shape[0]):
 
@@ -102,7 +102,7 @@ def df2bows(df, w2i, n=1):
         for gram in grams:
             response_bow[idx, w2i[gram]] = 1
 
-    return context_bow, response_bow
+    return context_bow.cuda(), response_bow.cuda()
 
 if __name__ == '__main__':
 
@@ -127,7 +127,7 @@ if __name__ == '__main__':
     counter = Counter()
     for df in dfs:
         for idx, row in tqdm(df.iterrows(), total=df.shape[0]):
-            line = row['context']
+            line = row['context'] + ' ' + row['response']
             grams = preprocess_utils.get_grams(line, n=args.n)
             for gram in grams:
                 counter[gram] += 1
@@ -145,21 +145,21 @@ if __name__ == '__main__':
     design_matrix = DesignMatrix(w2i, train_df, n=args.n)
 
     # test
-    test_context_bow  = df2bow(test_df, w2i, n=args.n)
+    test_context_bow, test_response_bow  = df2bows(test_df, w2i, n=args.n)
     test_scores, test_max_overlap_indices = preprocess_utils.batch_compute_scores_sep(
-        design_matrix, 1024,
-        test_context_bow, None,
-        verbose=False,
+        design_matrix, 8192,
+        test_context_bow, test_response_bow,
+        verbose=True,
     )
     preprocess_utils.dump_results(train_df, test_df, test_scores, test_max_overlap_indices, 'test')
     del test_context_bow
 
     # valid
-    valid_context_bow = df2bow(valid_df, w2i, n=args.n)
+    valid_context_bow, valid_response_bow = df2bows(valid_df, w2i, n=args.n)
     valid_scores, valid_max_overlap_indices = preprocess_utils.batch_compute_scores_sep(
-        design_matrix, 1024,
-        valid_context_bow, None,
-        verbose=False,
+        design_matrix, 8192,
+        valid_context_bow, valid_response_bow,
+        verbose=True,
     )
     preprocess_utils.dump_results(train_df, valid_df, valid_scores, valid_max_overlap_indices, 'valid')
     del valid_context_bow

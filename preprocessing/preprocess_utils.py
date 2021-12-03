@@ -223,11 +223,11 @@ def compute_scores_sep(train_context_bow, train_response_bow, eval_context_bow, 
             generated the maximum overlap. (shape: (num_eval_samples,))
     '''
     context_score_matrix = compute_score_matrix(eval_context_bow, train_context_bow)
-    # response_score_matrix = compute_score_matrix(train_response_bow, eval_response_bow)
+    response_score_matrix = compute_score_matrix(eval_response_bow, train_response_bow)
 
     # score_matrix  = (context_score_matrix + response_score_matrix) / 2
-    # score_matrix  = np.minimum(context_score_matrix, response_score_matrix)
-    score_matrix = context_score_matrix
+    score_matrix  = torch.minimum(context_score_matrix, response_score_matrix)
+    # score_matrix = context_score_matrix
 
     max_overlap_indices = score_matrix.argmax(axis=1)
     scores = score_matrix[range(score_matrix.shape[0]), max_overlap_indices]
@@ -266,8 +266,8 @@ def batch_compute_scores_sep(
         if verbose:
             print('batch: {}/{}'.format(batch_idx, len(loader)))
 
-        batch_train_context_bow = batch.cuda()
-        batch_train_response_bow = None
+        batch_train_context_bow = batch['context_bow'].cuda()
+        batch_train_response_bow = batch['response_bow'].cuda()
 
         num_eval_samples = eval_context_bow.shape[0]
 
