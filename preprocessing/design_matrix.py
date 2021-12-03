@@ -20,12 +20,23 @@ class DesignMatrix(Dataset):
         self.n = n
 
     def __getitem__(self, index):
+
         context = self.df['context'][index]
         grams = preprocess_utils.get_grams(context, n=self.n)
-        bow = torch.zeros(self.vocab_size, dtype=torch.float16)
+        context_bow = torch.zeros(self.vocab_size, dtype=torch.float16)
         for gram in grams:
-            bow[self.w2i[gram]] = 1
-        return bow
+            context_bow[self.w2i[gram]] = 1
+
+        response = self.df['response'][index]
+        grams = preprocess_utils.get_grams(response, n=self.n)
+        response_bow = torch.zeros(self.vocab_size, dtype=torch.float16)
+        for gram in grams:
+            response_bow[self.w2i[gram]] = 1
+
+        return {
+            'context_bow': context_bow,
+            'response_bow': response_bow
+        }
 
     def __len__(self):
         return self.df.shape[0]

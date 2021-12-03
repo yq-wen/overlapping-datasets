@@ -5,10 +5,16 @@ import argparse
 import pathlib
 import tqdm
 import torch
+import pickle
 
-from collections import OrderedDict, Counter
+import matplotlib.pyplot as plt
+import preprocess_utils
+
+from collections import OrderedDict, Counter, namedtuple
 from nltk import word_tokenize
 from preprocess_utils import get_grams
+
+Movie = namedtuple('Movie', ['movie_id', 'movie_lines'])
 
 def build_w2i(movies):
 
@@ -61,7 +67,31 @@ if __name__ == '__main__':
             movie_lines = list(map(lambda x: x.strip().replace('1 ', ''), movie_lines))
             movies[p.name.replace('.txt', '')] = movie_lines
 
+    num_movies = len(movies)
+
     w2i = build_w2i(movies)
     bow = build_bow(movies, w2i)
+    score_matrix = preprocess_utils.compute_score_matrix(bow, bow)
+    score_matrix[range(num_movies), range(num_movies)] = 0
+    max_overlap, max_overlap_idx = score_matrix.max(dim=1)
+    sorted_max_overlap, sorted_max_overlap_indices = max_overlap.sort()
+
+    plt.hist(max_overlap.cpu().numpy())
+    plt.savefig('movie_overlap.png')
+
+    drop_indices = []
+    keep_indices = []
+    drop_movie_ids = []
+
+    for idx, (movie_id, movie_lines) in tqdm.tqdm(enumerate(movies.items())):
+        if max_overlap[idx] > 0.75:
+            drop_indices.append(idx)
+            keep_indices.append(max_overlap_idx[idx])
+            drop_movie_ids.append(movie_id)
+
+    print('Dropping {} movies'.format(len(drop_movie_ids)))
+
+    with open('drop.txt', mode='w') as f:
+        f.write('\n'.join(drop_movie_ids))
 
     print('done!')
