@@ -130,14 +130,8 @@ dmypy.json
 
 # repo specific
 data/*
-!data/hareesh
 !data/ijcnlp_dailydialog
-!data/wen
 !data/dedup
-!data/alpha_1.0_dailydialog/
-!data/alpha_1.3_dailydialog/
-!data/precision_dailydialog/
-!data/precision_dedup/
 !data/proposed/
 log/
 test_logs/
