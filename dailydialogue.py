@@ -105,6 +105,7 @@ class DailyDialogueDataset(Dataset):
             attention_mask = torch.cat((context_encoded.attention_mask, response_encoded.attention_mask), dim=1)
             labels = input_ids.clone()
             labels[attention_mask == 0] = -100
+            labels[:, :max_length] = -100
 
             self.data = dict()
             self.data['input_ids'] = input_ids
