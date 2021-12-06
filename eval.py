@@ -392,6 +392,7 @@ if __name__ == '__main__':
     parser.add_argument('--max-num-dialogues', type=int, default=None)
     parser.add_argument('--gen-from-text', action='store_true')
     parser.add_argument('--generated-path', type=str, default='')
+    parser.add_argument('--tokenizer-str', type=str, default='t5-small')
 
     args = parser.parse_args()
 
@@ -405,7 +406,14 @@ if __name__ == '__main__':
     else:
         model = torch.load(args.ckpt, map_location=device)
         model.eval()
-        tokenizer = AutoTokenizer.from_pretrained("t5-base")
+        tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_str)
+
+    additional_tokens = {}
+    if not tokenizer.pad_token:
+        additional_tokens['pad_token'] = '<pad>'
+    if not tokenizer.sep_token:
+        additional_tokens['sep_token'] = '<sep>'
+    tokenizer.add_special_tokens(additional_tokens)
 
     tests = build_dd_tests_from_csv(
         path=args.eval_path,
