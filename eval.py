@@ -408,12 +408,12 @@ if __name__ == '__main__':
         model.eval()
         tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_str)
 
-    additional_tokens = {}
-    if not tokenizer.pad_token:
-        additional_tokens['pad_token'] = '<pad>'
-    if not tokenizer.sep_token:
-        additional_tokens['sep_token'] = '<sep>'
-    tokenizer.add_special_tokens(additional_tokens)
+        additional_tokens = {}
+        if not tokenizer.pad_token:
+            additional_tokens['pad_token'] = '<pad>'
+        if not tokenizer.sep_token:
+            additional_tokens['sep_token'] = '<sep>'
+        tokenizer.add_special_tokens(additional_tokens)
 
     tests = build_dd_tests_from_csv(
         path=args.eval_path,
