@@ -6,7 +6,9 @@ import pathlib
 import tqdm
 import torch
 import pickle
+import shutil
 
+import numpy as np
 import matplotlib.pyplot as plt
 import preprocess_utils
 
@@ -50,10 +52,21 @@ def build_bow(movies, w2i):
 
     return bow
 
+def dump_movies(movies, p):
+    movie_dir = pathlib.PosixPath(args.movie_dir)
+    with open(p, mode='w') as f_out:
+        for movie_id, movie_text in movies:
+            with open(pathlib.PosixPath(movie_dir, movie_id + '.txt'), mode='r') as f_in:
+                f_out.write(f_in.read())
+
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--movie-dir', type=str, default='output')
+    parser.add_argument('--movie-dir', type=str, default='dedup_samples')
+    parser.add_argument('--num-test', type=int, default=220)
+    parser.add_argument('--num-valid', type=int, default=90)
+    parser.add_argument('--num-train', type=int, default=[1000, 2000, 3000, 4000, 5000], nargs='+')
 
     args = parser.parse_args()
 
@@ -64,34 +77,34 @@ if __name__ == '__main__':
     for p in movie_dir.glob('*.txt'):
         with open(p, mode='r') as f:
             movie_lines = f.readlines()
-            movie_lines = list(map(lambda x: x.strip().replace('1 ', ''), movie_lines))
+            movie_lines = list(map(lambda x: x.strip()[2:].replace('\t', ' '), movie_lines))
             movies[p.name.replace('.txt', '')] = movie_lines
 
     num_movies = len(movies)
 
     w2i = build_w2i(movies)
     bow = build_bow(movies, w2i)
+
     score_matrix = preprocess_utils.compute_score_matrix(bow, bow)
     score_matrix[range(num_movies), range(num_movies)] = 0
+
     max_overlap, max_overlap_idx = score_matrix.max(dim=1)
     sorted_max_overlap, sorted_max_overlap_indices = max_overlap.sort()
 
-    plt.hist(max_overlap.cpu().numpy())
-    plt.savefig('movie_overlap.png')
+    movie_list = list(movies.items())
+    sorted_movies = []
 
-    drop_indices = []
-    keep_indices = []
-    drop_movie_ids = []
+    for idx in sorted_max_overlap_indices:
+        sorted_movies.append(movie_list[idx])
 
-    for idx, (movie_id, movie_lines) in tqdm.tqdm(enumerate(movies.items())):
-        if max_overlap[idx] > 0.75:
-            drop_indices.append(idx)
-            keep_indices.append(max_overlap_idx[idx])
-            drop_movie_ids.append(movie_id)
+    test_movies = sorted_movies[:args.num_test]
+    valid_movies = sorted_movies[args.num_test:args.num_test+args.num_valid]
+    remaining_movies = sorted_movies[args.num_test+args.num_valid:]
 
-    print('Dropping {} movies'.format(len(drop_movie_ids)))
+    dump_movies(test_movies, 'test.txt')
+    dump_movies(valid_movies, 'valid.txt')
 
-    with open('drop.txt', mode='w') as f:
-        f.write('\n'.join(drop_movie_ids))
+    for num in args.num_train:
+        dump_movies(remaining_movies[:num], 'train_{}.txt'.format(num))
 
-    print('done!')
+    print('splitting done!')
