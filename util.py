@@ -82,10 +82,10 @@ def build_dd_tests_from_csv(
             if 'score' in row.index:
                 # Special format with overlap score and train_context and
                 # eval_context for comparisons
-                test = Test(row['score'], row['eval_context'], [row['eval_response']])
+                test = Test(row['score'], row['eval_context'].lower(), [row['eval_response'].lower()])
             else:
                 # standard format without overlap scores
-                test = Test(math.nan, row['context'], [row['response']])
+                test = Test(math.nan, row['context'].lower(), [row['response'].lower()])
             tests.append(test)
         else:
             break

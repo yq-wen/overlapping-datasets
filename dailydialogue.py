@@ -18,8 +18,8 @@ class DailyDialogueDataset(Dataset):
             responses = []
 
             for index, row in df.iterrows():
-                contexts.append(row['context'].strip())
-                responses.append(tokenizer.sep_token + ' ' + row['response'].strip() + ' ' + tokenizer.eos_token)
+                contexts.append(row['context'].strip().lower())
+                responses.append(tokenizer.sep_token + ' ' + row['response'].strip().lower() + ' ' + tokenizer.eos_token)
 
             context_encoded = tokenizer(
                 contexts,
