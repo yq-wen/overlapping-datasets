@@ -54,8 +54,8 @@ class DailyDialogueDataset(Dataset):
             responses = []
 
             for index, row in df.iterrows():
-                contexts.append(row['context'])
-                responses.append(row['response'])
+                contexts.append(row['context'].lower())
+                responses.append(row['response'].lower())
 
             inputs = tokenizer(
                 contexts,
