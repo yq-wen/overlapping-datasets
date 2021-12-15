@@ -4,6 +4,7 @@ import datetime
 import pathlib
 import sys
 import subprocess
+import json
 import numpy as np
 
 from transformers import AutoTokenizer, AutoModelWithLMHead
@@ -14,6 +15,7 @@ from opensubtitles import OpenSubtitlesDataset
 from dateutil import tz
 from eval import eval_model
 from util import build_dd_tests_from_csv
+from pathlib import PosixPath
 
 
 DEFAULT_THRESHOLDS = [0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 1.00]
@@ -51,49 +53,74 @@ class BaseTrainer():
         log_root_dir=None,
         sanity=False,
         save_every=1,
+        resume_path='',
     ):
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        self.model = model
-        self.model.to(self.device)
-
-        self.train_dataset = train_dataset
-        self.eval_dataset = eval_dataset
-
-        self.num_epochs = num_epochs
-        self.learning_rate = learning_rate
-        self.log_every = log_every
-        self.save_models = save_models
-        self.sanity = sanity
-        self.batch_size = batch_size
-        self.save_every = save_every
-
-        # Set up for logging
-        if not log_root_dir:
-            log_root_dir = BaseTrainer.LOG_ROOT_DIR
-        self.log_root_dir = pathlib.PosixPath(log_root_dir)
-        if not self.log_root_dir.exists():
-            self.log_root_dir.mkdir()
-
         tzone = tz.gettz('America/Edmonton')
         self.timestamp = datetime.datetime.now().astimezone(tzone).strftime('%Y-%m-%d_%H:%M:%S')
-        self.log_dir = pathlib.PosixPath(self.log_root_dir, self.timestamp)
-        self.log_dir.mkdir()
+
+        if resume_path:
+
+            self.model = model.cuda()
+            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
+            self.scaler = torch.cuda.amp.GradScaler()
+
+            ckpt = torch.load(PosixPath(resume_path, 'last_checkpoint.pt'))
+
+            self.model.load_state_dict(ckpt['model'])
+            self.optimizer.load_state_dict(ckpt['optimizer'])
+            self.scaler.load_state_dict(ckpt['scaler'])
+
+            with open(PosixPath(resume_path, 'last_state.json'), mode='r') as f:
+                state = json.load(f)
+
+            self.training_steps = state['training_steps']
+            self.epoch = state['epoch'] + 1
+            self.global_step = state['global_step']
+
+            # logging
+            self.log_root_dir = PosixPath(resume_path).parent
+            self.log_dir = resume_path
+
+        else:
+
+            self.model = model
+            # Set up for optimizer
+            self.learning_rate = learning_rate
+            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
+            self.scaler = torch.cuda.amp.GradScaler()
+
+            self.training_steps = 0
+            self.epoch = 1
+            self.global_step = 0
+
+            # Set up for logging
+            if not log_root_dir:
+                log_root_dir = BaseTrainer.LOG_ROOT_DIR
+            self.log_root_dir = pathlib.PosixPath(log_root_dir)
+            if not self.log_root_dir.exists():
+                self.log_root_dir.mkdir()
+            self.log_dir = pathlib.PosixPath(self.log_root_dir, self.timestamp)
+            self.log_dir.mkdir()
 
         self.log_txt_path = pathlib.PosixPath(self.log_dir, self.timestamp + '.log')
         self.logger = Logger(self.log_txt_path)
         sys.stdout = self.logger
         sys.stderr = self.logger
 
+        self.log_every = log_every
+        self.save_models = save_models
+        self.sanity = sanity
+        self.batch_size = batch_size
+        self.save_every = save_every
+
+        self.model.to(self.device)
+        self.num_epochs = num_epochs
+        self.train_dataset = train_dataset
+        self.eval_dataset = eval_dataset
         self.writer = SummaryWriter(log_dir=self.log_dir)  # tensorboard support
-
-        self.training_steps = 0
-        self.epoch = 0
-        self.global_step = 0
-
-        # Set up for optimizer
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
 
         print('> Command:', ' '.join(sys.argv))
         print()
@@ -115,8 +142,27 @@ class BaseTrainer():
         pass
 
     def epoch_end(self):
-        # evaluation
-        pass
+
+        checkpoint = {
+            'model': self.model.state_dict(),
+            'optimizer': self.optimizer.state_dict(),
+            'scaler': self.scaler.state_dict(),
+        }
+        torch.save(checkpoint, PosixPath(self.log_dir, 'last_checkpoint.pt'))
+
+        # torch.save(self.model, PosixPath(self.log_dir, 'last_model.pt'))
+        # torch.save(self.optimizer, PosixPath(self.log_dir, 'last_optimizer.pt'))
+        # torch.save(self.scaler, PosixPath(self.log_dir, 'last_scaler.pt'))
+
+        last_state = dict()
+        last_state['training_steps'] = self.training_steps
+        last_state['epoch'] = self.epoch
+        last_state['global_step'] = self.global_step
+
+        with open(PosixPath(self.log_dir, 'last_state.json'), mode='w') as f:
+            json.dump(last_state, f)
+
+        return
 
     def save(self):
         if self.save_models:
@@ -124,8 +170,6 @@ class BaseTrainer():
                 torch.save(self.model, pathlib.PosixPath(self.log_dir, 'epoch_{}.pt'.format(self.epoch)))
 
     def train(self):
-
-        scaler = torch.cuda.amp.GradScaler()
 
         # Sanity check before training
         if self.sanity:
@@ -137,7 +181,7 @@ class BaseTrainer():
 
         # Epoch 0 is reserved for before training
         print('> start of the training loop')
-        for epoch in range(1, self.num_epochs + 1):
+        for epoch in range(self.epoch, self.num_epochs + 1):
 
             self.epoch = epoch
 
@@ -154,9 +198,9 @@ class BaseTrainer():
 
                     self.optimizer.zero_grad()
 
-                    scaler.scale(loss).backward()
-                    scaler.step(self.optimizer)
-                    scaler.update()
+                    self.scaler.scale(loss).backward()
+                    self.scaler.step(self.optimizer)
+                    self.scaler.update()
 
                     if batch_idx % self.log_every == 0:
                         self.writer.add_scalar('train/loss', loss, self.global_step)
@@ -186,7 +230,8 @@ class T5Trainer(BaseTrainer):
             eval_every=1,
             eval_tests=None,
             thresholds=None,
-        **kwargs):
+            **kwargs
+        ):
 
         self.eval_every = eval_every
         self.eval_tests = eval_tests
@@ -267,6 +312,7 @@ class T5Trainer(BaseTrainer):
                             torch.save(self.model, save_path)
                             self.best_path[k] = save_path
 
+        return super().epoch_end()
 
 if __name__ == '__main__':
 
@@ -290,6 +336,7 @@ if __name__ == '__main__':
     parser.add_argument('--no-thresholds', action='store_true', help='when set, eval with all samples')
     parser.add_argument('--num-dist-samples', type=int, default=None)
     parser.add_argument('--max-length', type=int, default=64, help='maximum utterance length (# of tokens)')
+    parser.add_argument('--resume-path', default='')
 
     # Model parameters
     parser.add_argument('--model-str', type=str, default='t5-base')
@@ -359,6 +406,7 @@ if __name__ == '__main__':
         eval_tests=eval_tests,
         sanity=args.sanity,
         thresholds=thresholds,
+        resume_path=args.resume_path,
     )
 
     trainer.train()
