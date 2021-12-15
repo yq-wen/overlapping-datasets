@@ -174,7 +174,8 @@ class BaseTrainer():
             self.model.train()
             for batch_idx, batch in enumerate(self.train_loader):
 
-                loss = self.compute_loss(batch)
+                with torch.cuda.amp.autocast():
+                    loss = self.compute_loss(batch)
 
                 if loss.requires_grad:
 
