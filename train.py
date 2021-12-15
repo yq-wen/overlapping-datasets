@@ -87,7 +87,7 @@ class BaseTrainer():
         else:
 
             self.training_steps = 0
-            self.epoch = 1
+            self.epoch = 0 if sanity else 1
             self.global_step = 0
 
             # Set up for logging
@@ -157,12 +157,13 @@ class BaseTrainer():
     def train(self):
 
         # Sanity check before training
-        if self.sanity:
+        if self.sanity and self.epoch == 0:
             self.model.eval()
             print('> perfomring a sanity check...')
             with torch.no_grad():
                 self.save()  # save a copy of the untuned model
                 self.epoch_end()
+                self.epoch = 1
 
         # Epoch 0 is reserved for before training
         print('> start of the training loop')
