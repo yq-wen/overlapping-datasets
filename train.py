@@ -61,11 +61,14 @@ class BaseTrainer():
         tzone = tz.gettz('America/Edmonton')
         self.timestamp = datetime.datetime.now().astimezone(tzone).strftime('%Y-%m-%d_%H:%M:%S')
 
-        if resume_path:
+        self.model = model.cuda()
 
-            self.model = model.cuda()
-            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
-            self.scaler = torch.cuda.amp.GradScaler()
+        # Set up for optimizer
+        self.learning_rate = learning_rate
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
+        self.scaler = torch.cuda.amp.GradScaler()
+
+        if resume_path:
 
             ckpt = torch.load(PosixPath(resume_path, 'last_checkpoint.pt'))
 
@@ -73,24 +76,15 @@ class BaseTrainer():
             self.optimizer.load_state_dict(ckpt['optimizer'])
             self.scaler.load_state_dict(ckpt['scaler'])
 
-            with open(PosixPath(resume_path, 'last_state.json'), mode='r') as f:
-                state = json.load(f)
-
-            self.training_steps = state['training_steps']
-            self.epoch = state['epoch'] + 1
-            self.global_step = state['global_step']
+            self.training_steps = ckpt['training_steps']
+            self.epoch = ckpt['epoch'] + 1
+            self.global_step = ckpt['global_step']
 
             # logging
             self.log_root_dir = PosixPath(resume_path).parent
             self.log_dir = resume_path
 
         else:
-
-            self.model = model
-            # Set up for optimizer
-            self.learning_rate = learning_rate
-            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
-            self.scaler = torch.cuda.amp.GradScaler()
 
             self.training_steps = 0
             self.epoch = 1
@@ -147,20 +141,11 @@ class BaseTrainer():
             'model': self.model.state_dict(),
             'optimizer': self.optimizer.state_dict(),
             'scaler': self.scaler.state_dict(),
+            'training_steps': self.training_steps,
+            'epoch': self.epoch,
+            'global_step': self.global_step,
         }
         torch.save(checkpoint, PosixPath(self.log_dir, 'last_checkpoint.pt'))
-
-        # torch.save(self.model, PosixPath(self.log_dir, 'last_model.pt'))
-        # torch.save(self.optimizer, PosixPath(self.log_dir, 'last_optimizer.pt'))
-        # torch.save(self.scaler, PosixPath(self.log_dir, 'last_scaler.pt'))
-
-        last_state = dict()
-        last_state['training_steps'] = self.training_steps
-        last_state['epoch'] = self.epoch
-        last_state['global_step'] = self.global_step
-
-        with open(PosixPath(self.log_dir, 'last_state.json'), mode='w') as f:
-            json.dump(last_state, f)
 
         return
 
