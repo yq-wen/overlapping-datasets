@@ -54,6 +54,7 @@ class BaseTrainer():
         sanity=False,
         save_every=1,
         resume_path='',
+        fp16=False,
     ):
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -67,6 +68,8 @@ class BaseTrainer():
         self.learning_rate = learning_rate
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
         self.scaler = torch.cuda.amp.GradScaler()
+
+        self.fp16 = fp16
 
         if resume_path:
 
@@ -175,7 +178,10 @@ class BaseTrainer():
             self.model.train()
             for batch_idx, batch in enumerate(self.train_loader):
 
-                with torch.cuda.amp.autocast():
+                if self.fp16:
+                    with torch.cuda.amp.autocast():
+                        loss = self.compute_loss(batch)
+                else:
                     loss = self.compute_loss(batch)
 
                 if loss.requires_grad:
@@ -308,6 +314,7 @@ if __name__ == '__main__':
     parser.add_argument('--num-training-examples', type=int, default=None)
     parser.add_argument('--dataset', type=str, default='dd', help="dailydialogue or opensubtitles")
     parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--fp16', action='store_true')
 
     parser.add_argument('--save-every', type=int, default=1)
     parser.add_argument('--eval-every', type=int, default=1)
@@ -394,6 +401,7 @@ if __name__ == '__main__':
         sanity=args.sanity,
         thresholds=thresholds,
         resume_path=args.resume_path,
+        fp16=args.fp16,
     )
 
     trainer.train()
