@@ -16,6 +16,7 @@ def flatten(path, num_contexts=1):
 
             # [:-1] because last string is empty after splitting
             utterances = dialog.strip().split('__eou__')[:-1]
+            utterances = list(map(lambda x: x.strip(), utterances))
 
             for i in range(len(utterances) - num_contexts):
 

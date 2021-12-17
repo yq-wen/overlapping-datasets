@@ -35,14 +35,15 @@ if __name__ == '__main__':
     # /home/yuqiao/anaconda3/envs/multimodal/lib/python3.6/site-packages/data/OpenSubtitles2018/OpenSubtitles
     parser.add_argument('--path', type=str, default='/home/yuqiao/anaconda3/envs/multimodal/lib/python3.6/site-packages/data/OpenSubtitles2018/OpenSubtitles')
     parser.add_argument('--history', action='store_true')
-    parser.add_argument('--output-dir', type=str, default='full')
+    parser.add_argument('--output-dir', type=str, default='full-hist')
     parser.add_argument('--use-history', action='store_true')
 
     args = parser.parse_args()
 
     output_dir = pathlib.PosixPath(args.output_dir)
-    if not output_dir.exists():
+    if output_dir.exists():
         shutil.rmtree(output_dir)
+    output_dir.mkdir()
 
     movies = get_list_of_files(args.path)
     processor = build_2018.DataProcessor(args.use_history)

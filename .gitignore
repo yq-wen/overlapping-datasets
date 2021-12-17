@@ -133,5 +133,6 @@ data/*
 !data/ijcnlp_dailydialog
 !data/dedup
 !data/proposed/
+!data/ost_proposed/
 log/
 test_logs/

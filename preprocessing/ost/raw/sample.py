@@ -7,7 +7,7 @@ from pathlib import PosixPath
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dir', type=str, default='full')
+    parser.add_argument('--dir', type=str, default='full-hist')
     parser.add_argument('--num-samples', type=int, default=10000)
 
     args = parser.parse_args()
