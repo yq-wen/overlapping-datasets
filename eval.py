@@ -13,7 +13,7 @@ from transformers import AutoTokenizer, BertTokenizer, GPT2TokenizerFast
 from util import build_dd_tests_from_csv
 from nltk.collocations import BigramCollocationFinder
 from nltk.probability import FreqDist
-from nltk import word_tokenize
+from nltk import word_tokenize, wordpunct_tokenize
 
 
 BLEU_WEIGHTS_MEAN = [
@@ -39,7 +39,7 @@ def list_drop_indices(input_list, drop_indices):
 def str_tokenize(sent):
     '''Given a sentence (str), return a list of tokenized characters
     '''
-    return word_tokenize(sent)
+    return wordpunct_tokenize(sent)
 
 def generate_fn(model, tokenizer, post, max_length):
     '''
