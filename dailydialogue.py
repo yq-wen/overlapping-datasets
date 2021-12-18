@@ -12,41 +12,32 @@ class DailyDialogueDataset(Dataset):
 
         df = pd.read_csv(path)
 
-        if 'gpt2' in tokenizer.name_or_path:
+        if 'gpt2' in tokenizer.name_or_path or 'DialoGPT' in tokenizer.name_or_path:
 
             contexts = []
             responses = []
 
+            samples = []
+
             for index, row in df.iterrows():
-                contexts.append(row['context'].strip().lower())
-                responses.append(tokenizer.sep_token + ' ' + row['response'].strip().lower() + ' ' + tokenizer.eos_token)
+                context = row['context'].strip().lower()
+                response = row['response'].strip().lower()
+                sample = '{} {} {} {}'.format(context, tokenizer.sep_token, response, tokenizer.eos_token)
+                samples.append(sample)
 
-            context_encoded = tokenizer(
-                contexts,
-                max_length=max_length-1 ,
+            encoded = tokenizer(
+                samples,
+                max_length=max_length * 2,
                 truncation=True,
                 padding='max_length',
                 return_tensors='pt',
             )
-
-            response_encoded = tokenizer(
-                responses,
-                max_length=max_length+1,
-                truncation=True,
-                padding='max_length',
-                return_tensors='pt',
-            )
-
-            input_ids = torch.cat((context_encoded.input_ids, response_encoded.input_ids), dim=1)
-            attention_mask = torch.cat((context_encoded.attention_mask, response_encoded.attention_mask), dim=1)
-            labels = input_ids.clone()
-            labels[attention_mask == 0] = -100
-            labels[:, :max_length] = -100
 
             self.data = dict()
-            self.data['input_ids'] = input_ids
-            self.data['attention_mask'] = attention_mask
-            self.data['labels'] = labels
+            self.data['input_ids'] = encoded['input_ids']
+            self.data['attention_mask'] = encoded['attention_mask']
+            self.data['labels'] = encoded['input_ids'].clone()
+            self.data['labels'][encoded['attention_mask'] == 0] = -100
 
         else:
 

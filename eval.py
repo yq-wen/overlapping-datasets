@@ -50,7 +50,7 @@ def generate_fn(model, tokenizer, post, max_length):
         tuple (list<str>, list<float>): ([resp1, resp2, ...], [score1, score2, ...])
     '''
 
-    if 'gpt2' in model.name_or_path:
+    if 'gpt2' in model.name_or_path or 'DialoGPT' in model.name_or_path:
         post += ' ' + tokenizer.sep_token
 
     input_ids = tokenizer.encode(post, return_tensors='pt').to(device)
@@ -61,7 +61,7 @@ def generate_fn(model, tokenizer, post, max_length):
     max_output_length = max_length
     input_length = len(input_ids[0])
 
-    if 'gpt2' in model.name_or_path:
+    if 'gpt2' in model.name_or_path or 'DialoGPT' in model.name_or_path:
         # gpt2 models' output includes input
         # therefore add the length of the input
         max_output_length += input_length
@@ -70,14 +70,15 @@ def generate_fn(model, tokenizer, post, max_length):
         input_ids=input_ids,
         # no_repeat_ngram_size=1,
         bad_words_ids=[[tokenizer.unk_token_id]],
-        repetition_penalty=1.2,  # recommended in https://arxiv.org/pdf/1909.05858.pdf
+        # repetition_penalty=1.2,  # recommended in https://arxiv.org/pdf/1909.05858.pdf
         output_scores=True,
         return_dict_in_generate=True,
         max_length=max_output_length,
         pad_token_id=tokenizer.pad_token_id,
+        # eos_token_id=tokenizer.eos_token_id,
     )
 
-    if 'gpt2' in model.name_or_path:
+    if 'gpt2' in model.name_or_path or 'DialoGPT' in model.name_or_path:
         # for gpt2 models, generated sequences always start with the input
         sequence = generated.sequences[0][input_length:]
     else:
@@ -94,7 +95,7 @@ def generate_fn(model, tokenizer, post, max_length):
     self_ppl = torch.exp(-log_prob_sum / len(sequence)).item()
     response = tokenizer.decode(sequence, skip_special_tokens=True)
 
-    responses.append(response)
+    responses.append(response.lower())
     self_ppls.append(self_ppl)
 
     return responses, self_ppls
