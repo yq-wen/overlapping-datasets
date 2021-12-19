@@ -134,5 +134,6 @@ data/*
 !data/dedup
 !data/proposed/
 !data/ost_proposed/
+!data/ost_dedup/
 log/
 test_logs/
