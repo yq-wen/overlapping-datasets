@@ -1,0 +1,8 @@
+OpenSubtitles/
+output/
+full/
+full-hist/
+samples/
+dedup_samples/
+dedup_samples_prev_attempt
+old_wip/
