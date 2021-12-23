@@ -414,6 +414,7 @@ if __name__ == '__main__':
             additional_tokens['pad_token'] = '<pad>'
         if not tokenizer.sep_token:
             additional_tokens['sep_token'] = '<sep>'
+        tokenizer.add_tokens('__eou__')
         tokenizer.add_special_tokens(additional_tokens)
 
     tests = build_dd_tests_from_csv(
