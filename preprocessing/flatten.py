@@ -18,11 +18,12 @@ def flatten(path, num_contexts=1):
             utterances = dialog.strip().split('__eou__')[:-1]
             utterances = list(map(lambda x: x.strip(), utterances))
 
-            for i in range(len(utterances) - num_contexts):
+            for i in range(1, len(utterances)):
 
-                context_lst = utterances[i : i + num_contexts]
-                context_str = ' '.join(context_lst)
-                response_str = utterances[i + num_contexts]
+                response_str = utterances[i]
+                local_num_contexts = min(i, num_contexts)
+                context_lst = utterances[i-local_num_contexts:i]
+                context_str = ' __eou__ '.join(context_lst)
 
                 dialogs.append([context_str, response_str])
 
@@ -33,7 +34,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--input-path')
     parser.add_argument('--output-path')
+    parser.add_argument('--num-contexts', type=int, default=1)
 
     args = parser.parse_args()
 
-    flatten(args.input_path).to_csv(args.output_path, index=False)
+    flatten(args.input_path, num_contexts=args.num_contexts).to_csv(args.output_path, index=False)
