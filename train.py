@@ -271,7 +271,7 @@ class T5Trainer(BaseTrainer):
                     stream=f,
                     thresholds=thresholds,
                     num_dist_samples=args.num_dist_samples,
-                    max_length=args.max_length,
+                    max_length=args.max_output_length,
                 )
 
             for k, v in results.items():
@@ -330,6 +330,7 @@ if __name__ == '__main__':
     parser.add_argument('--no-thresholds', action='store_true', help='when set, eval with all samples')
     parser.add_argument('--num-dist-samples', type=int, default=None)
     parser.add_argument('--max-length', type=int, default=64, help='maximum utterance length (# of tokens)')
+    parser.add_argument('--max-output-length', type=int, default=64)
     parser.add_argument('--resume-path', default='')
 
     # Model parameters
