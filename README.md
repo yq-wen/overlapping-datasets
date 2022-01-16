@@ -1,12 +1,7 @@
-# few-shot-dialogue
+# An Empirical Study on the Overlapping Problem of Open-Domain Dialogue Datasets
 
+## Cleaned Datasets
 
-Train the Dailydialogue dataset
-```sh
-$ python3 train.py --dataset dd --train-path data/dedup/train.csv --eval-path data/dedup/test.csv --model-str t5-base
-```
-
-Train the Opensubtitles dataset
-```sh
-$ python3 train.py --dataset ost --train-path data/data_ost/df_ost_train_v2.csv --eval-path data/data_ost/test_ost_compare.csv --model-str t5-base
-```
+Our cleaned datasets can be downloaded at:
+1. [DailyDialog](https://github.com/yq-wen/overlapping-datasets/releases/download/v0.1/cleaned_dd.zip)
+2. [OpenSubtitles](https://github.com/yq-wen/overlapping-datasets/releases/download/v0.1/cleaned_ost.zip)
